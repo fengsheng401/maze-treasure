@@ -15,7 +15,9 @@ import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ROOT, "src")
-OUT = os.path.join(ROOT, "迷宫寻宝.html")
+# 产物放仓库根目录并命名为 index.html：
+# 1) 本地双击直接玩  2) GitHub Pages 部署时自动成为网站首页
+OUT = os.path.join(ROOT, "index.html")
 
 # 含内嵌音乐时产物约 2.9 MB；低于这个数说明音频丢了
 MIN_BYTES = 2_800_000
