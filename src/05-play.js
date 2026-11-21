@@ -162,6 +162,7 @@ $('key-mode').onchange=()=>{save.prefs.keyMode=$('key-mode').value;writeSave();a
 $('high-contrast').onchange=()=>{save.prefs.contrast=$('high-contrast').checked;writeSave();applyPreferences();};$('large-text').onchange=()=>{save.prefs.large=$('large-text').checked;writeSave();applyPreferences();};
 labelControls();new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1){if(node.matches('button,input,select,textarea,a[href],[tabindex]')&&!node.hasAttribute('aria-label'))node.setAttribute('aria-label',(node.textContent||node.id).trim());labelControls(node);}}).observe(document.body,{childList:true,subtree:true});
 $('skin').onchange=()=>{save.prefs.skin=$('skin').value;writeSave();applyPreferences();};
+$('avatar-skin').onchange=()=>{save.prefs.avatarSkin=$('avatar-skin').value;writeSave();applyPreferences();};
 $('mute').onclick=toggleMute;document.addEventListener('click',initAudio,{capture:true});applyPreferences();
 loadRequestedLevel();if(!save.tutorialDone)startTutorial();if(storageWarning)tell(storageWarning);setInterval(tick,250);
 setInterval(()=>{if(state&&!document.hidden&&!document.querySelector('dialog[open]'))render();},160);

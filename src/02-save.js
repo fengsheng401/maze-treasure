@@ -104,12 +104,12 @@ function normalizeSave(raw) {
   for(const [date,record] of Object.entries(raw.daily||{})) {if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isInteger(record.steps)||record.steps<1||!Number.isFinite(record.time)||record.time<0)throw new Error('每日成绩无效');if(record.hints!==undefined&&(!Number.isInteger(record.hints)||record.hints<0))throw new Error('每日提示次数无效');daily[date]={steps:record.steps,time:record.time,hints:record.hints||0};}
   if(raw.tutorialDone!==undefined&&typeof raw.tutorialDone!=='boolean')throw new Error('教程状态无效');
   for(const key of ['muted','contrast','large'])if(raw.prefs?.[key]!==undefined&&typeof raw.prefs[key]!=='boolean')throw new Error('偏好设置无效');
-  return {version:1,mapGen:raw.mapGen===2?2:1,current:raw.current,unlocked:raw.unlocked,bests,daily,stats:normalizeStats(raw.stats),endless:normalizeEndless(raw.endless),tutorialDone:raw.tutorialDone===true,prefs:{difficulty:Object.hasOwn(DIFFICULTIES,raw.prefs?.difficulty)?raw.prefs.difficulty:'standard',keyMode:['both','arrows','wasd','custom'].includes(raw.prefs?.keyMode)?raw.prefs.keyMode:'both',bindings:normalizeBindings(raw.prefs?.bindings),muted:raw.prefs?.muted===true,music:raw.prefs?.music!==false,sideFs:Number.isInteger(raw.prefs?.sideFs)?Math.max(10,Math.min(17,raw.prefs.sideFs)):12,contrast:raw.prefs?.contrast===true,large:raw.prefs?.large===true,skin:['ruins','forest','space'].includes(raw.prefs?.skin)?raw.prefs.skin:'ruins'}};
+  return {version:1,mapGen:raw.mapGen===2?2:1,current:raw.current,unlocked:raw.unlocked,bests,daily,stats:normalizeStats(raw.stats),endless:normalizeEndless(raw.endless),tutorialDone:raw.tutorialDone===true,prefs:{difficulty:Object.hasOwn(DIFFICULTIES,raw.prefs?.difficulty)?raw.prefs.difficulty:'standard',keyMode:['both','arrows','wasd','custom'].includes(raw.prefs?.keyMode)?raw.prefs.keyMode:'both',bindings:normalizeBindings(raw.prefs?.bindings),muted:raw.prefs?.muted===true,music:raw.prefs?.music!==false,sideFs:Number.isInteger(raw.prefs?.sideFs)?Math.max(10,Math.min(17,raw.prefs.sideFs)):12,contrast:raw.prefs?.contrast===true,large:raw.prefs?.large===true,skin:['ruins','forest','space','purple','emerald'].includes(raw.prefs?.skin)?raw.prefs.skin:'ruins',avatarSkin:['original','red','orange','yellow','green','blue','indigo','violet'].includes(raw.prefs?.avatarSkin)?raw.prefs.avatarSkin:'original'}};
 }
 function readSave() {
   try {const text=localStorage.getItem(SAVE_KEY);if(text)return normalizeSave(JSON.parse(text));}
   catch(error){storageWarning='本地存档不可用或已损坏；本次仍可游玩。';}
-  return {version:1,current:1,unlocked:1,bests:{},daily:{},stats:emptyStats(),endless:normalizeEndless(),tutorialDone:false,mapGen:2,prefs:{difficulty:'standard',muted:false,music:true,sideFs:12,skin:'ruins',contrast:false,large:false,keyMode:'both',bindings:{...DEFAULT_BINDINGS}}};
+  return {version:1,current:1,unlocked:1,bests:{},daily:{},stats:emptyStats(),endless:normalizeEndless(),tutorialDone:false,mapGen:2,prefs:{difficulty:'standard',muted:false,music:true,sideFs:12,skin:'ruins',avatarSkin:'original',contrast:false,large:false,keyMode:'both',bindings:{...DEFAULT_BINDINGS}}};
 }
 function writeSave() {try{localStorage.setItem(SAVE_KEY,JSON.stringify(save));}catch(error){storageWarning='浏览器未允许本地存档，请允许存储后重试。';tell(storageWarning);}}
 let hintCells=new Set(),hintTimer=null;
@@ -154,6 +154,7 @@ function applyPreferences() {
   $('mute').textContent=save.prefs.muted?'声音：关':'声音：开';$('mute').setAttribute('aria-pressed',String(save.prefs.muted));
   $('music').textContent=save.prefs.music===false?'音乐：关':'音乐：开';$('music').setAttribute('aria-pressed',String(save.prefs.music!==false));
   document.documentElement.dataset.skin=save.prefs.skin;$('skin').value=save.prefs.skin;
+  document.documentElement.dataset.avatarSkin=save.prefs.avatarSkin;$('avatar-skin').value=save.prefs.avatarSkin;
   document.documentElement.dataset.contrast=String(save.prefs.contrast);document.documentElement.dataset.large=String(save.prefs.large);$('high-contrast').checked=save.prefs.contrast;$('large-text').checked=save.prefs.large;$('music-toggle').checked=save.prefs.music!==false;
   $('mute').setAttribute('aria-label',save.prefs.muted?'打开声音':'关闭声音');
   $('key-mode').value=save.prefs.keyMode;$('custom-bindings').hidden=save.prefs.keyMode!=='custom';

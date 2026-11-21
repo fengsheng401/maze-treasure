@@ -30,6 +30,9 @@
     --danger: #ff8a7a;
     --button: #422e20;
     --shadow: #0009;
+    --outfit: #d87851;
+    --outfit-belt: #72432b;
+    --outfit-legs: #e1bc83;
     --cell: 21px;
     --row: 27px;
     --mono: "Cascadia Mono",Consolas,"Courier New",monospace;
@@ -79,6 +82,52 @@
     --wall-edge: #2c4b66;
     --button: #163448;
     --danger: #ff9ba9;
+  }
+
+  :root[data-skin="purple"] {
+    --bg: #291d3a;
+    --panel: #38264e;
+    --board: #1d142b;
+    --line: #573b73;
+    --panel-line: #755297;
+    --text: #f4eafa;
+    --muted: #cfb7e3;
+    --gold: #ffda8c;
+    --green: #bd9bff;
+    --wall: #c899ef;
+    --floor: #8155aa;
+    --memory: #77618c;
+    --memory-wall: #392747;
+    --memory-edge: #7c599c;
+    --memory-floor: #503860;
+    --wall-block: #402955;
+    --wall-edge: #bf8aef;
+    --unknown: #130d1e;
+    --button: #432e5c;
+    --danger: #ff9aaf;
+  }
+
+  :root[data-skin="emerald"] {
+    --bg: #183627;
+    --panel: #244634;
+    --board: #163727;
+    --line: #39694c;
+    --panel-line: #598b65;
+    --text: #edfae9;
+    --muted: #c1e0c9;
+    --gold: #ffe6a0;
+    --green: #a8f3b8;
+    --wall: #a2e6b2;
+    --floor: #75ba8c;
+    --memory: #69997a;
+    --memory-wall: #254634;
+    --memory-edge: #598d69;
+    --memory-floor: #3e694c;
+    --wall-block: #1d543d;
+    --wall-edge: #81dca4;
+    --unknown: #0c2117;
+    --button: #2c553c;
+    --danger: #ffada2;
   }
 
   :root[data-contrast="true"] {
@@ -899,8 +948,15 @@
   #avatar { background: none; color: #f6cca0; border-radius: 0; filter: drop-shadow(0 2px 2px #000b); }
   .adventurer { position: absolute; inset: 2px 1px; transform-origin: 50% 85%; }
   .adventurer::before { content: ''; position: absolute; width: 48%; height: 30%; top: 3%; left: 26%; background: #f1c99e; border-top: 3px solid #543831; border-radius: 40% 40% 32% 32%; z-index: 2; }
-  .adventurer::after { content: ''; position: absolute; width: 58%; height: 43%; top: 32%; left: 21%; background: #d87851; border-radius: 35% 35% 15% 15%; border-bottom: 3px solid #72432b; box-shadow: -3px 1px 0 -1px #ecc297,3px 1px 0 -1px #ecc297; }
-  .adventurer i { position: absolute; left: 27%; bottom: 0; height: 29%; width: 19%; background: #e1bc83; box-shadow: 6px 0 #e1bc83; border-bottom: 3px solid #4a3232; }
+  :root[data-avatar-skin="red"] { --outfit: #ef5350; --outfit-belt: #8f2d36; --outfit-legs: #e8b4a1; }
+  :root[data-avatar-skin="orange"] { --outfit: #ff9b3d; --outfit-belt: #a75120; --outfit-legs: #f1ca8c; }
+  :root[data-avatar-skin="yellow"] { --outfit: #f4d64c; --outfit-belt: #937129; --outfit-legs: #ecd995; }
+  :root[data-avatar-skin="green"] { --outfit: #4ed184; --outfit-belt: #267a4c; --outfit-legs: #abdab5; }
+  :root[data-avatar-skin="blue"] { --outfit: #4ba8f5; --outfit-belt: #285d98; --outfit-legs: #a8cce9; }
+  :root[data-avatar-skin="indigo"] { --outfit: #6968d9; --outfit-belt: #3d3f88; --outfit-legs: #b9b9e4; }
+  :root[data-avatar-skin="violet"] { --outfit: #b878ef; --outfit-belt: #754597; --outfit-legs: #d6b5e8; }
+  .adventurer::after { content: ''; position: absolute; width: 58%; height: 43%; top: 32%; left: 21%; background: var(--outfit); border-radius: 35% 35% 15% 15%; border-bottom: 3px solid var(--outfit-belt); box-shadow: -3px 1px 0 -1px #ecc297,3px 1px 0 -1px #ecc297; }
+  .adventurer i { position: absolute; left: 27%; bottom: 0; height: 29%; width: 19%; background: var(--outfit-legs); box-shadow: 6px 0 var(--outfit-legs); border-bottom: 3px solid #4a3232; }
   .adventurer b { position: absolute; top: 18%; left: 35%; width: 2px; height: 2px; background: #342b31; box-shadow: 4px 0 #342b31; z-index: 3; }
   #avatar[data-facing='up'] .adventurer::before { background: #543831; }
   #avatar[data-facing='up'] .adventurer b { visibility: hidden; }
@@ -1151,10 +1207,22 @@
       <details class="mobile-menu" id="game-menu" open>
       <summary class="button secondary">菜单</summary>
       <nav class="topbar" id="topbar" aria-label="游戏菜单">
-        <label class="small">皮肤 <select id="skin" aria-label="选择皮肤">
+        <label class="small">背景 <select id="skin" aria-label="选择地图背景">
           <option value="ruins">黄昏</option>
           <option value="forest">樱林</option>
           <option value="space">太空</option>
+          <option value="purple">紫色</option>
+          <option value="emerald">浅翠绿</option>
+        </select></label>
+        <label class="small">人物 <select id="avatar-skin" aria-label="选择人物皮肤" title="所有颜色均可自由选择，无需解锁">
+          <option value="original">原色</option>
+          <option value="red">红</option>
+          <option value="orange">橙</option>
+          <option value="yellow">黄</option>
+          <option value="green">绿</option>
+          <option value="blue">蓝</option>
+          <option value="indigo">靛</option>
+          <option value="violet">紫</option>
         </select></label>
         <button class="button secondary" id="mute" title="点击页面后启用合成音效">声音：开</button>
         <button class="button secondary" id="music" title="背景音乐开关">音乐：开</button>
@@ -1629,12 +1697,12 @@ function normalizeSave(raw) {
   for(const [date,record] of Object.entries(raw.daily||{})) {if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isInteger(record.steps)||record.steps<1||!Number.isFinite(record.time)||record.time<0)throw new Error('每日成绩无效');if(record.hints!==undefined&&(!Number.isInteger(record.hints)||record.hints<0))throw new Error('每日提示次数无效');daily[date]={steps:record.steps,time:record.time,hints:record.hints||0};}
   if(raw.tutorialDone!==undefined&&typeof raw.tutorialDone!=='boolean')throw new Error('教程状态无效');
   for(const key of ['muted','contrast','large'])if(raw.prefs?.[key]!==undefined&&typeof raw.prefs[key]!=='boolean')throw new Error('偏好设置无效');
-  return {version:1,mapGen:raw.mapGen===2?2:1,current:raw.current,unlocked:raw.unlocked,bests,daily,stats:normalizeStats(raw.stats),endless:normalizeEndless(raw.endless),tutorialDone:raw.tutorialDone===true,prefs:{difficulty:Object.hasOwn(DIFFICULTIES,raw.prefs?.difficulty)?raw.prefs.difficulty:'standard',keyMode:['both','arrows','wasd','custom'].includes(raw.prefs?.keyMode)?raw.prefs.keyMode:'both',bindings:normalizeBindings(raw.prefs?.bindings),muted:raw.prefs?.muted===true,music:raw.prefs?.music!==false,sideFs:Number.isInteger(raw.prefs?.sideFs)?Math.max(10,Math.min(17,raw.prefs.sideFs)):12,contrast:raw.prefs?.contrast===true,large:raw.prefs?.large===true,skin:['ruins','forest','space'].includes(raw.prefs?.skin)?raw.prefs.skin:'ruins'}};
+  return {version:1,mapGen:raw.mapGen===2?2:1,current:raw.current,unlocked:raw.unlocked,bests,daily,stats:normalizeStats(raw.stats),endless:normalizeEndless(raw.endless),tutorialDone:raw.tutorialDone===true,prefs:{difficulty:Object.hasOwn(DIFFICULTIES,raw.prefs?.difficulty)?raw.prefs.difficulty:'standard',keyMode:['both','arrows','wasd','custom'].includes(raw.prefs?.keyMode)?raw.prefs.keyMode:'both',bindings:normalizeBindings(raw.prefs?.bindings),muted:raw.prefs?.muted===true,music:raw.prefs?.music!==false,sideFs:Number.isInteger(raw.prefs?.sideFs)?Math.max(10,Math.min(17,raw.prefs.sideFs)):12,contrast:raw.prefs?.contrast===true,large:raw.prefs?.large===true,skin:['ruins','forest','space','purple','emerald'].includes(raw.prefs?.skin)?raw.prefs.skin:'ruins',avatarSkin:['original','red','orange','yellow','green','blue','indigo','violet'].includes(raw.prefs?.avatarSkin)?raw.prefs.avatarSkin:'original'}};
 }
 function readSave() {
   try {const text=localStorage.getItem(SAVE_KEY);if(text)return normalizeSave(JSON.parse(text));}
   catch(error){storageWarning='本地存档不可用或已损坏；本次仍可游玩。';}
-  return {version:1,current:1,unlocked:1,bests:{},daily:{},stats:emptyStats(),endless:normalizeEndless(),tutorialDone:false,mapGen:2,prefs:{difficulty:'standard',muted:false,music:true,sideFs:12,skin:'ruins',contrast:false,large:false,keyMode:'both',bindings:{...DEFAULT_BINDINGS}}};
+  return {version:1,current:1,unlocked:1,bests:{},daily:{},stats:emptyStats(),endless:normalizeEndless(),tutorialDone:false,mapGen:2,prefs:{difficulty:'standard',muted:false,music:true,sideFs:12,skin:'ruins',avatarSkin:'original',contrast:false,large:false,keyMode:'both',bindings:{...DEFAULT_BINDINGS}}};
 }
 function writeSave() {try{localStorage.setItem(SAVE_KEY,JSON.stringify(save));}catch(error){storageWarning='浏览器未允许本地存档，请允许存储后重试。';tell(storageWarning);}}
 let hintCells=new Set(),hintTimer=null;
@@ -1679,6 +1747,7 @@ function applyPreferences() {
   $('mute').textContent=save.prefs.muted?'声音：关':'声音：开';$('mute').setAttribute('aria-pressed',String(save.prefs.muted));
   $('music').textContent=save.prefs.music===false?'音乐：关':'音乐：开';$('music').setAttribute('aria-pressed',String(save.prefs.music!==false));
   document.documentElement.dataset.skin=save.prefs.skin;$('skin').value=save.prefs.skin;
+  document.documentElement.dataset.avatarSkin=save.prefs.avatarSkin;$('avatar-skin').value=save.prefs.avatarSkin;
   document.documentElement.dataset.contrast=String(save.prefs.contrast);document.documentElement.dataset.large=String(save.prefs.large);$('high-contrast').checked=save.prefs.contrast;$('large-text').checked=save.prefs.large;$('music-toggle').checked=save.prefs.music!==false;
   $('mute').setAttribute('aria-label',save.prefs.muted?'打开声音':'关闭声音');
   $('key-mode').value=save.prefs.keyMode;$('custom-bindings').hidden=save.prefs.keyMode!=='custom';
@@ -2472,6 +2541,7 @@ $('key-mode').onchange=()=>{save.prefs.keyMode=$('key-mode').value;writeSave();a
 $('high-contrast').onchange=()=>{save.prefs.contrast=$('high-contrast').checked;writeSave();applyPreferences();};$('large-text').onchange=()=>{save.prefs.large=$('large-text').checked;writeSave();applyPreferences();};
 labelControls();new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1){if(node.matches('button,input,select,textarea,a[href],[tabindex]')&&!node.hasAttribute('aria-label'))node.setAttribute('aria-label',(node.textContent||node.id).trim());labelControls(node);}}).observe(document.body,{childList:true,subtree:true});
 $('skin').onchange=()=>{save.prefs.skin=$('skin').value;writeSave();applyPreferences();};
+$('avatar-skin').onchange=()=>{save.prefs.avatarSkin=$('avatar-skin').value;writeSave();applyPreferences();};
 $('mute').onclick=toggleMute;document.addEventListener('click',initAudio,{capture:true});applyPreferences();
 loadRequestedLevel();if(!save.tutorialDone)startTutorial();if(storageWarning)tell(storageWarning);setInterval(tick,250);
 setInterval(()=>{if(state&&!document.hidden&&!document.querySelector('dialog[open]'))render();},160);
