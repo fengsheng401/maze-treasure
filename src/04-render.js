@@ -5,12 +5,12 @@ function tileAt(view,id) {
   if(!view.isReplay&&hintCells.has(id))return {char:'*',type:'hint'};
   if(!view.seen.has(id))return {char:' ',type:'unseen'};
   let char=view.map.cells[id]?'#':'·',type=view.map.cells[id]?'wall':view.visited.has(id)?'visited':'floor';
-  const door=view.map.doors?.find(d=>d.pos===id),item=view.map.items?.find(i=>i.pos===id&&!view.takenItems?.has(id)),chest=view.map.chests?.find(c=>c.pos===id),trap=view.map.traps?.find(t=>t.pos===id&&(!t.hardOnly||view.difficulty==='hardcore'));
+  const door=view.map.doors&&view.map.doors.find(d=>d.pos===id),item=view.map.items&&view.map.items.find(i=>i.pos===id&&!(view.takenItems&&view.takenItems.has(id))),chest=view.map.chests&&view.map.chests.find(c=>c.pos===id),trap=view.map.traps&&view.map.traps.find(t=>t.pos===id&&(!t.hardOnly||view.difficulty==='hardcore'));
   if(trap){char='△';type='trap';}
   if(item){char={torch:'T',map:'M',compass:'C'}[item.type];type='item';}
-  if(chest){char=view.openedChests?.has(id)?'□':'▣';type=view.openedChests?.has(id)?'floor':'chest';}
+  if(chest){char=view.openedChests&&view.openedChests.has(id)?'□':'▣';type=view.openedChests&&view.openedChests.has(id)?'floor':'chest';}
   if(door){char=LOCK_SIGNS[door.key];type=view.collected.has(view.map.keys[door.key])?'gate-open':'gate';}
-  if(view.guards?.some((g,i)=>view.map.guards[i].path[g.index]===id)){char='G';type='guard';}
+  if(view.guards&&view.guards.some((g,i)=>view.map.guards[i].path[g.index]===id)){char='G';type='guard';}
   if(view.isReplay&&view.visited.has(id)){char='*';type='key';}
   if(view.map.keys.includes(id)&&!view.collected.has(id)){char=String(view.map.keys.indexOf(id)+1);type='key';}
   if(id===view.map.exit){char='E';type=view.collected.size===view.map.keys.length?'door open':'door';}
@@ -82,7 +82,7 @@ let drawCache={map:null,key:'',tiles:new Int32Array()};
 const TILE_TYPES={unseen:0,wall:1,floor:2,visited:3,key:4,door:5,'door open':6,remembered:7,'remembered-wall':9,'remembered-floor':10,hint:8,gate:11,'gate-open':12,item:13,trap:14,chest:15,guard:16};
 /* ===== [J8] 渲染 ===== */
 function render() {
-  const started=performance.now(),view=replay?.view||state;
+  const started=performance.now(),view=replay&&replay.view||state;
   fitCell(view.map);
   const canvas=$('maze'),cell=cellMetrics(),ratio=Math.min(window.devicePixelRatio||1,2);
   const width=view.map.width*cell.width,height=view.map.height*cell.height;
@@ -145,9 +145,9 @@ function renderMinimap(view) {
 }
 function renderHUD() {
   $('steps').textContent=state.moves;$('timer').textContent=formatTime(state.elapsed);$('collected').textContent=`${state.collected.size} / ${state.map.keys.length}`;
-  if($('keys').children.length!==state.map.keys.length)$('keys').replaceChildren(...state.map.keys.map((_,i)=>{const el=document.createElement('span');el.className='key-slot';el.textContent=i+1;return el;}));
+  if($('keys').children.length!==state.map.keys.length)setChildren($('keys'),state.map.keys.map((_,i)=>{const el=document.createElement('span');el.className='key-slot';el.textContent=i+1;return el;}));
   [...$('keys').children].forEach((el,i)=>{const got=state.collected.has(state.map.keys[i]),blocked=!got&&state.keyReach&&!state.keyReach.has(i);el.classList.toggle('found',got);el.classList.toggle('locked',blocked);el.setAttribute('aria-label',`钥匙 ${i+1} ${got?'已收集':blocked?'被锁门挡住，暂时拿不到':'未收集'}`);});
-  const view=replay?.view||state;$('board-meta').textContent=`${view.map.width} × ${view.map.height}`;
+  const view=replay&&replay.view||state;$('board-meta').textContent=`${view.map.width} × ${view.map.height}`;
   $('level-title').textContent=replay?`${lastWin.mode==='endless'?'无尽模式 · ':''}第 ${lastWin.endlessStage||lastWin.level} 关路线回放 · ${replay.index} / ${lastWin.route.length-1}`:state.mode==='endless'?`无尽模式 · 第 ${state.endlessStage} 关`:state.mode==='daily'?`${dailyDate(state.seed)} 每日挑战（本地时间 0 点换日）`:state.mode==='custom'?'自定义关卡':state.mode==='tutorial'?'三步引导':`第 ${Math.ceil(state.level/5)} 章 · ${state.level} / ${LEVELS.length} 关 · ${LEVELS[state.level-1].name}`;
   const endlessButton=$('endless'),endlessLabel=state.mode==='endless'?'退出无尽':'无尽模式';
   if(endlessButton.textContent!==endlessLabel)endlessButton.textContent=endlessLabel;
@@ -156,7 +156,7 @@ function renderHUD() {
   const unlocked=state.collected.size===state.map.keys.length;
   $('objective').textContent=unlocked?'出口发出绿光，前往 E 处通关。':'数字钥匙开启相同编号的锁门；集齐后前往 E。';
   const torchSeconds=Math.ceil(Math.max(0,state.torchUntil-state.elapsed)/1000);
-  $('inventory').textContent=`${torchSeconds?'火把 '+torchSeconds+' 秒':'火把：未点燃'} · ${state.compass?'罗盘已启用':'罗盘：未找到'} · 宝箱 ${state.openedChests.size}/${state.map.chests?.length||0}`;
+  $('inventory').textContent=`${torchSeconds?'火把 '+torchSeconds+' 秒':'火把：未点燃'} · ${state.compass?'罗盘已启用':'罗盘：未找到'} · 宝箱 ${state.openedChests.size}/${state.map.chests&&state.map.chests.length||0}`;
   $('difficulty').disabled=!!replay||state.mode==='tutorial';$('pause').disabled=!!replay||!['ready','playing'].includes(state.status);
   const remaining=view.map.keys.filter(id=>!view.collected.has(id));$('compass').hidden=!state.compass||!remaining.length||!!replay;
   if(!$('compass').hidden){const target=remaining.reduce((a,b)=>Math.hypot(a%view.map.width-view.pos%view.map.width,Math.floor(a/view.map.width)-Math.floor(view.pos/view.map.width))<Math.hypot(b%view.map.width-view.pos%view.map.width,Math.floor(b/view.map.width)-Math.floor(view.pos/view.map.width))?a:b);const angle=Math.atan2(Math.floor(target/view.map.width)-Math.floor(view.pos/view.map.width),target%view.map.width-view.pos%view.map.width)*180/Math.PI;$('compass').innerHTML=`<b style="transform:rotate(${angle}deg)">→</b>钥匙 ${view.map.keys.indexOf(target)+1}`;}
@@ -166,12 +166,12 @@ function renderHUD() {
 }
 function centerPlayer() {
   const stage=$('maze-stage'),style=getComputedStyle(document.documentElement),cw=parseFloat(style.getPropertyValue('--cell')),rh=parseFloat(style.getPropertyValue('--row'));
-  const view=replay?.view||state;
+  const view=replay&&replay.view||state;
   const x=(view.pos%view.map.width)*cw,y=Math.floor(view.pos/view.map.width)*rh;
   if(x<stage.scrollLeft+cw||x>stage.scrollLeft+stage.clientWidth-cw*3)stage.scrollLeft=Math.max(0,x-stage.clientWidth/2);
   if(y<stage.scrollTop+rh||y>stage.scrollTop+stage.clientHeight-rh*3)stage.scrollTop=Math.max(0,y-stage.clientHeight/2);
 }
-function tick() {const now=performance.now();if(state?.status==='playing'&&!replay&&!document.hidden&&!document.querySelector('dialog[open]')){state.elapsed+=now-lastTick;updateVision();}lastTick=now;if(state)$('timer').textContent=formatTime(state.elapsed);}
+function tick() {const now=performance.now();if(state&&state.status==='playing'&&!replay&&!document.hidden&&!document.querySelector('dialog[open]')){state.elapsed+=now-lastTick;updateVision();}lastTick=now;if(state)$('timer').textContent=formatTime(state.elapsed);}
 function bump(message) {tell(message);$('maze-frame').classList.remove('flash');void $('maze-frame').offsetWidth;$('maze-frame').classList.add('flash');}
 function finishLevel() {
   tick();state.status='won';sound('win');recordLevel();recordStatistics();
@@ -179,7 +179,7 @@ function finishLevel() {
   $('victory-grade').textContent=lastWin.grade;
   $('victory-title').textContent=`${state.mode==='endless'?'无尽模式 · ':''}第 ${state.endlessStage||state.level} 关寻宝成功`;
   $('win-stats').textContent=`${lastWin.grade} 级 · 实走 ${state.moves} 步 / 理论最短 ${state.optimal} 步（${(state.moves/state.optimal).toFixed(2)}×） · ${formatTime(state.elapsed)} · 提示 ${state.hints} 次 · 撤销 ${state.undoUses} 次`;
-  const next=state.mode==='endless'?(BigInt(state.endlessStage)+1n).toString():state.mode==='campaign'&&state.level<LEVELS.length?state.level+1:null;
+  const next=state.mode==='endless'?(BigInt(state.endlessStage)+BigInt(1)).toString():state.mode==='campaign'&&state.level<LEVELS.length?state.level+1:null;
   $('victory-description').textContent=state.outro;
   $('continue').textContent=next?`继续第 ${next} 关`:'再玩一次';
   if(state.mode==='campaign'&&state.level===15&&LEVELS.every((_,i)=>save.bests[i+1]))showEnding();else $('victory').showModal();

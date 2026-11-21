@@ -1,5 +1,5 @@
 'use strict';
-const CACHE_NAME = 'ascii-vault-offline-v2';
+const CACHE_NAME = 'ascii-vault-offline-v3';
 const APP_URL = new URL('index.html', self.registration.scope).href;
 const MANIFEST_URL = new URL('manifest.webmanifest', self.registration.scope).href;
 const ICON_URLS = ['icons/icon-192.png', 'icons/icon-512.png'].map(p => new URL(p, self.registration.scope).href);

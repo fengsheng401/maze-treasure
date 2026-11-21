@@ -8,7 +8,7 @@ function normalizeKey(key) {return key.length===1?key.toLowerCase():key;}
 function bindableKey(key) {return typeof key==='string'&&key.length>0&&key.length<=32&&!['Tab','Escape','Control','Alt','Meta','Shift','Dead','Unidentified','Process'].includes(key);}
 function normalizeBindings(raw) {
   if(raw===undefined)return {...DEFAULT_BINDINGS};
-  const result={};for(const dir of Object.keys(DIRS)){if(!bindableKey(raw?.[dir]))throw new Error('自定义键位无效');result[dir]=normalizeKey(raw[dir]);}
+  const result={};for(const dir of Object.keys(DIRS)){if(!bindableKey(raw?raw[dir]:undefined))throw new Error('自定义键位无效');result[dir]=normalizeKey(raw[dir]);}
   if(new Set(Object.values(result)).size!==4)throw new Error('方向键位不能重复');return result;
 }
 function directionFor(key) {
@@ -47,7 +47,7 @@ function normalizeStats(raw) {
   if(result.streak>result.bestStreak||result.bestStreak>result.wins)throw new Error('连续通关统计无效');result.fastest=raw.fastest;
   if(!Array.isArray(raw.achievements)||raw.achievements.some(id=>!ACHIEVEMENTS.some(a=>a[0]===id)))throw new Error('成就数据无效');result.achievements=[...new Set(raw.achievements)];
   for(const key of ['sRanks','cleanRuns','chests']){if(raw[key]!==undefined&&(!Number.isSafeInteger(raw[key])||raw[key]<0))throw new Error('扩展统计无效');result[key]=raw[key]||0;}
-  if(raw.itemKinds!==undefined&&(!Array.isArray(raw.itemKinds)||raw.itemKinds.some(k=>!Object.hasOwn(ITEM_NAMES,k))))throw new Error('道具统计无效');result.itemKinds=[...new Set(raw.itemKinds||[])];
+  if(raw.itemKinds!==undefined&&(!Array.isArray(raw.itemKinds)||raw.itemKinds.some(k=>!Object.prototype.hasOwnProperty.call(ITEM_NAMES,k))))throw new Error('道具统计无效');result.itemKinds=[...new Set(raw.itemKinds||[])];
   if(raw.recent!==undefined&&(!Array.isArray(raw.recent)||raw.recent.length>24||raw.recent.some(r=>!r||!Number.isInteger(r.level)||r.level<1||r.level>15||!Number.isInteger(r.steps)||r.steps<1)))throw new Error('趋势记录无效');result.recent=(raw.recent||[]).map(r=>({level:r.level,steps:r.steps}));
   return result;
 }
@@ -58,9 +58,9 @@ function recordStatistics() {
   if(state.mode==='tutorial')return;
   if(state.mode==='endless') {
     if(BigInt(state.endlessStage)>BigInt(save.endless.highestStage))save.endless.highestStage=state.endlessStage;
-    save.endless.wins=(BigInt(save.endless.wins)+1n).toString();writeSave();return;
+    save.endless.wins=(BigInt(save.endless.wins)+BigInt(1)).toString();writeSave();return;
   }
-  const stats=save.stats;stats.wins++;stats.streak++;stats.bestStreak=Math.max(stats.bestStreak,stats.streak);stats.fastest=Math.min(stats.fastest??Infinity,state.elapsed);
+  const stats=save.stats;stats.wins++;stats.streak++;stats.bestStreak=Math.max(stats.bestStreak,stats.streak);stats.fastest=Math.min(stats.fastest!=null?stats.fastest:Infinity,state.elapsed);
   const grade=gradeRun(state.moves,state.optimal),earned=['first'];
   if(grade==='S'){stats.sRanks++;earned.push('rankS');}if(['S','A'].includes(grade))earned.push('rankA');
   if(!state.undoUses)earned.push('noUndo');if(!state.hints){stats.cleanRuns++;earned.push('noHint');}
@@ -73,7 +73,7 @@ function recordStatistics() {
 function showStatistics() {
   $('endless-summary').textContent=`无尽模式 · 最高通关：${save.endless.highestStage==='0'?'尚未通关':'第 '+save.endless.highestStage+' 关'} · 累计通关：${save.endless.wins} 次（独立统计）`;
   const stats=save.stats;$('stats-summary').textContent=`总步数：${stats.totalSteps}　总通关：${stats.wins}　最快：${stats.fastest===null?'暂无':formatTime(stats.fastest)}　最长连续通关：${stats.bestStreak}`;
-  $('achievement-list').replaceChildren(...ACHIEVEMENTS.map(([id,title])=>{const li=document.createElement('li');li.textContent=(stats.achievements.includes(id)?'已达成 · ':'未达成 · ')+title;li.style.color=stats.achievements.includes(id)?'var(--gold)':'var(--muted)';return li;}));$('stats-dialog').showModal();const streak=dailyStreak();$('daily-streak').textContent=`每日挑战 · 当前连续 ${streak.current} 天 / 历史最长 ${streak.best} 天（通关记打卡，断一天归零）`;drawStatistics();
+  setChildren($('achievement-list'),ACHIEVEMENTS.map(([id,title])=>{const li=document.createElement('li');li.textContent=(stats.achievements.includes(id)?'已达成 · ':'未达成 · ')+title;li.style.color=stats.achievements.includes(id)?'var(--gold)':'var(--muted)';return li;}));$('stats-dialog').showModal();const streak=dailyStreak();$('daily-streak').textContent=`每日挑战 · 当前连续 ${streak.current} 天 / 历史最长 ${streak.best} 天（通关记打卡，断一天归零）`;drawStatistics();
 }
 function drawStatistics() {
   const canvas=$('stats-chart'),width=Math.max(240,canvas.clientWidth),height=180,ratio=Math.min(devicePixelRatio||1,2),ctx=canvas.getContext('2d'),style=getComputedStyle(document.documentElement),values=save.stats.recent;
@@ -99,12 +99,13 @@ function normalizeEndless(raw) {
 function normalizeSave(raw) {
   if(!raw||raw.version!==1||!Number.isInteger(raw.current)||raw.current<1||raw.current>LEVELS.length||!Number.isInteger(raw.unlocked)||raw.unlocked<raw.current||raw.unlocked>LEVELS.length)throw new Error('存档格式无效');
   const bests={};
-  for(let level=1;level<=LEVELS.length;level++) {const b=raw.bests?.[level];if(b){if(!Number.isInteger(b.steps)||b.steps<1||!Number.isFinite(b.time)||b.time<0)throw new Error('成绩无效');if(b.lastHints!==undefined&&(!Number.isInteger(b.lastHints)||b.lastHints<0))throw new Error('提示次数无效');bests[level]={steps:b.steps,time:b.time,lastHints:b.lastHints||0,lastGrade:['S','A','B','C'].includes(b.lastGrade)?b.lastGrade:null};}}
+  for(let level=1;level<=LEVELS.length;level++) {const b=raw.bests?raw.bests[level]:undefined;if(b){if(!Number.isInteger(b.steps)||b.steps<1||!Number.isFinite(b.time)||b.time<0)throw new Error('成绩无效');if(b.lastHints!==undefined&&(!Number.isInteger(b.lastHints)||b.lastHints<0))throw new Error('提示次数无效');bests[level]={steps:b.steps,time:b.time,lastHints:b.lastHints||0,lastGrade:['S','A','B','C'].includes(b.lastGrade)?b.lastGrade:null};}}
   const daily={};
   for(const [date,record] of Object.entries(raw.daily||{})) {if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isInteger(record.steps)||record.steps<1||!Number.isFinite(record.time)||record.time<0)throw new Error('每日成绩无效');if(record.hints!==undefined&&(!Number.isInteger(record.hints)||record.hints<0))throw new Error('每日提示次数无效');daily[date]={steps:record.steps,time:record.time,hints:record.hints||0};}
   if(raw.tutorialDone!==undefined&&typeof raw.tutorialDone!=='boolean')throw new Error('教程状态无效');
-  for(const key of ['muted','contrast','large'])if(raw.prefs?.[key]!==undefined&&typeof raw.prefs[key]!=='boolean')throw new Error('偏好设置无效');
-  return {version:1,mapGen:raw.mapGen===2?2:1,current:raw.current,unlocked:raw.unlocked,bests,daily,stats:normalizeStats(raw.stats),endless:normalizeEndless(raw.endless),tutorialDone:raw.tutorialDone===true,prefs:{difficulty:Object.hasOwn(DIFFICULTIES,raw.prefs?.difficulty)?raw.prefs.difficulty:'standard',keyMode:['both','arrows','wasd','custom'].includes(raw.prefs?.keyMode)?raw.prefs.keyMode:'both',bindings:normalizeBindings(raw.prefs?.bindings),muted:raw.prefs?.muted===true,music:raw.prefs?.music!==false,sideFs:Number.isInteger(raw.prefs?.sideFs)?Math.max(10,Math.min(17,raw.prefs.sideFs)):12,contrast:raw.prefs?.contrast===true,large:raw.prefs?.large===true,skin:['ruins','forest','space','purple','emerald'].includes(raw.prefs?.skin)?raw.prefs.skin:'ruins',avatarSkin:['original','red','orange','yellow','green','blue','indigo','violet'].includes(raw.prefs?.avatarSkin)?raw.prefs.avatarSkin:'original'}};
+  for(const key of ['muted','contrast','large'])if(raw.prefs&&raw.prefs[key]!==undefined&&typeof raw.prefs[key]!=='boolean')throw new Error('偏好设置无效');
+  const prefs=raw.prefs||{};
+  return {version:1,mapGen:raw.mapGen===2?2:1,current:raw.current,unlocked:raw.unlocked,bests,daily,stats:normalizeStats(raw.stats),endless:normalizeEndless(raw.endless),tutorialDone:raw.tutorialDone===true,prefs:{difficulty:Object.prototype.hasOwnProperty.call(DIFFICULTIES,prefs.difficulty)?prefs.difficulty:'standard',keyMode:['both','arrows','wasd','custom'].includes(prefs.keyMode)?prefs.keyMode:'both',bindings:normalizeBindings(prefs.bindings),muted:prefs.muted===true,music:prefs.music!==false,sideFs:Number.isInteger(prefs.sideFs)?Math.max(10,Math.min(17,prefs.sideFs)):12,contrast:prefs.contrast===true,large:prefs.large===true,skin:['ruins','forest','space','purple','emerald'].includes(prefs.skin)?prefs.skin:'ruins',avatarSkin:['original','red','orange','yellow','green','blue','indigo','violet'].includes(prefs.avatarSkin)?prefs.avatarSkin:'original'}};
 }
 function readSave() {
   try {const text=localStorage.getItem(SAVE_KEY);if(text)return normalizeSave(JSON.parse(text));}
@@ -170,7 +171,7 @@ function toggleMute() {
   const enabled=isSoundMuted();soundOptIn=true;save.prefs.muted=!enabled;
   if(enabled)save.prefs.music=true;
   writeSave();applyPreferences();
-  if(enabled){initAudio();startBgm();}else{stopBgm();audioContext?.suspend().catch(()=>{});}
+  if(enabled){initAudio();startBgm();}else{stopBgm();if(audioContext)audioContext.suspend().catch(()=>{});}
 }
 function setMusicEnabled(enabled) {
   save.prefs.music=enabled;
@@ -181,7 +182,7 @@ function setMusicEnabled(enabled) {
 /* ===== [J2] 每日挑战 ===== */
 /* 返回本地日期（本地时间 0 点换日），不再用 UTC */
 function todayUTC() {const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function dailyDate(seed) {return /^L3-daily-(\d{4}-\d{2}-\d{2})$/.exec(seed)?.[1]||null;}
+function dailyDate(seed) {const match=/^L3-daily-(\d{4}-\d{2}-\d{2})$/.exec(seed);return (match&&match[1])||null;}
 function dailyStreak(records=save.daily,today=todayUTC()) {
   const days=Object.keys(records).map(date=>Date.parse(date+'T00:00:00Z')/86400000).sort((a,b)=>a-b);let run=0,best=0,last=-Infinity;
   for(const day of days){run=day===last+1?run+1:1;best=Math.max(best,run);last=day;}
@@ -192,11 +193,11 @@ function startDaily() {const date=todayUTC();loadLevel(3,null,'daily','L3-daily-
 function recordLevel() {
   if(state.mode==='daily') {const date=dailyDate(state.seed);if(date&&!save.daily[date]){save.daily[date]={steps:state.moves,time:state.elapsed,hints:state.hints};writeSave();}updateDailyStatus();return;}
   if(state.mode!=='campaign')return;
-  const old=save.bests[state.level];save.bests[state.level]={steps:Math.min(old?.steps??Infinity,state.moves),time:Math.min(old?.time??Infinity,state.elapsed),lastHints:state.hints,lastGrade:gradeRun(state.moves,state.optimal)};
+  const old=save.bests[state.level];save.bests[state.level]={steps:Math.min(old&&old.steps!=null?old.steps:Infinity,state.moves),time:Math.min(old&&old.time!=null?old.time:Infinity,state.elapsed),lastHints:state.hints,lastGrade:gradeRun(state.moves,state.optimal)};
   save.unlocked=Math.max(save.unlocked,Math.min(LEVELS.length,state.level+1));writeSave();
 }
 function showLevels() {
-  $('level-list').replaceChildren(...CHAPTERS.map((chapter,chapterIndex)=>{
+  setChildren($('level-list'),CHAPTERS.map((chapter,chapterIndex)=>{
     const section=document.createElement('section');section.className='chapter';
     const eyebrow=document.createElement('p');eyebrow.className='eyebrow';eyebrow.textContent=chapter.tag;
     const title=document.createElement('h3');title.textContent=chapter.name;
@@ -221,7 +222,7 @@ function seededRandom(seed) {
 }
 function freshSeed(level) {return `L${level}-`+Array.from(crypto.getRandomValues(new Uint32Array(2)),n=>n.toString(36)).join('');}
 function endlessConfig(stage,difficulty,seed) {
-  const depth=Number(BigInt(stage)>60n?60n:BigInt(stage)),growth=(depth-1)/59,base=DIFFICULTIES[difficulty];
+  const depth=Number(BigInt(stage)>BigInt(60)?BigInt(60):BigInt(stage)),growth=(depth-1)/59,base=DIFFICULTIES[difficulty];
   const intros=['风从未知的回廊吹来，新的钥匙藏在岔路深处。','灯火照亮一段陌生石阶，每一道锁都在等待它的钥匙。','墙后的水声忽远忽近，沿着自己的脚步寻找出口。','新的门厅在迷雾中展开，记住走过的路，再向深处出发。','石墙上的刻痕指向远方，真正的方向要由你来寻找。','一阵回声穿过空荡的地宫，下一道门仍未开启。'];
   const outros=['这一层的石门已经打开，新的迷宫正在前方等待。','你留下了一串脚印，带着新的方向继续深入。','锁舌轻响，回廊向更深处延伸。','这一层的谜题已解开，下一次寻宝即将开始。'];
   const random=seededRandom(seed+'-story');

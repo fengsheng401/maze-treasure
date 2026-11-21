@@ -20,6 +20,8 @@
 
 'use strict';
 const $ = id => document.getElementById(id);
+/* Chrome 86 才有 replaceChildren；旧内核用这个等价函数，保持全浏览器可玩 */
+function setChildren(parent,children){while(parent.firstChild)parent.removeChild(parent.firstChild);for(let i=0;i<children.length;i++)parent.appendChild(children[i]);}
 const LEVELS = [
   {width:31,height:19,keys:3,name:'沉眠的门厅',intro:'门在你身后合上，锁孔里还留着旧钥匙的温度。',outro:'第一道门开了，后面还有四道。'},
   {width:35,height:23,keys:4,name:'苔痕回廊',intro:'苔藓漫过石阶，有人在这里点过火。',outro:'回廊尽头没有守卫，只有更深的回廊。'},

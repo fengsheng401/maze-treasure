@@ -22,7 +22,7 @@ function validateMap(input) {
       if(!value||!valid(value.pos)||occupied.has(value.pos))throw new Error('地城元素位置无效或重叠');occupied.add(value.pos);
       if(field==='doors'){if(!Number.isInteger(value.key)||value.key<0||value.key>=map.keys.length)throw new Error('门的钥匙编号无效');return {pos:value.pos,key:value.key};}
       if(field==='traps')return {pos:value.pos,hardOnly:value.hardOnly===true};
-      const type=field==='items'?value.type:value.loot;if(!Object.hasOwn(ITEM_NAMES,type))throw new Error('道具类型无效');return field==='items'?{pos:value.pos,type}:{pos:value.pos,loot:type};
+      const type=field==='items'?value.type:value.loot;if(!Object.prototype.hasOwnProperty.call(ITEM_NAMES,type))throw new Error('道具类型无效');return field==='items'?{pos:value.pos,type}:{pos:value.pos,loot:type};
     });
   }
   if(input.guards!==undefined){if(!Array.isArray(input.guards)||input.guards.length>12)throw new Error('守卫数量无效');map.guards=input.guards.map(g=>{if(!g||!Array.isArray(g.path)||g.path.length<2||g.path.length>100||g.path.some((id,i)=>!valid(id)||occupied.has(id)||!adjacent(map,id).includes(g.path[(i+1)%g.path.length])))throw new Error('守卫巡逻路线无效');return {path:[...g.path]};});}
@@ -54,7 +54,7 @@ function paintCell(id) {
   const tool=$('editor-tool').value;
   if(tool==='key'&&!draft.keys.includes(id)&&draft.keys.length>=8){$('editor-validation').textContent='最多放置 8 把钥匙；请先擦除一把。';return;}
   const removedKey=draft.keys.indexOf(id);
-  if(removedKey>=0)draft.doors=draft.doors?.filter(d=>d.key!==removedKey).map(d=>({...d,key:d.key>removedKey?d.key-1:d.key}));
+  if(removedKey>=0)draft.doors=draft.doors?draft.doors.filter(d=>d.key!==removedKey).map(d=>({...d,key:d.key>removedKey?d.key-1:d.key})):undefined;
   for(const field of ['doors','items','traps','chests'])if(draft[field])draft[field]=draft[field].filter(v=>v.pos!==id);
   if(draft.guards)draft.guards=draft.guards.filter(g=>!g.path.includes(id));
   draft.keys=draft.keys.filter(key=>key!==id);if(draft.start===id)draft.start=null;if(draft.exit===id)draft.exit=null;
@@ -120,7 +120,7 @@ function generateMap(width,height,keyCount,random=Math.random,braidRate=0.10,key
   }
   return map;
 }
-function lockedDoor(map,id,collected) {return map.doors?.find(d=>d.pos===id&&!collected.has(map.keys[d.key]));}
+function lockedDoor(map,id,collected) {return map.doors&&map.doors.find(d=>d.pos===id&&!collected.has(map.keys[d.key]));}
 function canCompleteMap(map) {
   const found=new Set();let previous=-1;
   while(previous!==found.size){previous=found.size;const paths=pathsFrom(map,map.start,true,found);for(const key of map.keys)if(paths.distances[key]>=0)found.add(key);}
@@ -131,7 +131,7 @@ function addDungeon(map,random,level,diffCfg) {
   map.doors=[];map.items=[];map.traps=[];map.chests=[];map.guards=[];
   const occupied=new Set([map.start,map.exit,...map.keys]);
   for(let key=0;key<map.keys.length;key++) {
-    const target=map.keys[key+1]??map.exit,paths=pathsFrom(map,map.start),route=[];
+    const target=map.keys[key+1]!=null?map.keys[key+1]:map.exit,paths=pathsFrom(map,map.start),route=[];
     for(let id=target;id!==map.start;id=paths.previous[id])route.push(id);
     for(const pos of route) {
       if(occupied.has(pos)||paths.distances[pos]<4)continue;
@@ -151,10 +151,10 @@ function addDungeon(map,random,level,diffCfg) {
   const all=pathsFrom(map,map.start).queue.filter(id=>!occupied.has(id));
   const take=pool=>{const choices=pool.filter(id=>!occupied.has(id));if(!choices.length)return null;const id=choices[Math.floor(random()*choices.length)];occupied.add(id);return id;};
   for(const type of ['torch','map','compass','torch']){const pos=take(free);if(pos!==null)map.items.push({pos,type});}
-  for(let i=0,chestCount=diffCfg?.chestCount??(2+Math.floor(level/5));i<chestCount;i++){const pos=take(all);if(pos!==null)map.chests.push({pos,loot:['torch','map','compass'][Math.floor(random()*3)]});}
-  for(let i=0,trapCount=diffCfg?.trapCount??Math.round((2+Math.ceil(level/3))*trapMul);i<trapCount;i++){const pos=take(all);if(pos!==null)map.traps.push({pos,hardOnly:i%2===1});}
+  for(let i=0,chestCount=diffCfg&&diffCfg.chestCount!=null?diffCfg.chestCount:2+Math.floor(level/5);i<chestCount;i++){const pos=take(all);if(pos!==null)map.chests.push({pos,loot:['torch','map','compass'][Math.floor(random()*3)]});}
+  for(let i=0,trapCount=diffCfg&&diffCfg.trapCount!=null?diffCfg.trapCount:Math.round((2+Math.ceil(level/3))*trapMul);i<trapCount;i++){const pos=take(all);if(pos!==null)map.traps.push({pos,hardOnly:i%2===1});}
   const startDistances=pathsFrom(map,map.start).distances;
-  for(let i=0,guardCount=diffCfg?.guardCount??Math.round(Math.min(2,1+Math.floor(level/7))*guardMul);i<guardCount;i++) {
+  for(let i=0,guardCount=diffCfg&&diffCfg.guardCount!=null?diffCfg.guardCount:Math.round(Math.min(2,1+Math.floor(level/7))*guardMul);i<guardCount;i++) {
     const candidates=all.filter(id=>!occupied.has(id)&&startDistances[id]>12);
     const start=take(candidates);if(start===null)break;
     const next=adjacent(map,start).find(id=>!map.cells[id]&&!occupied.has(id));if(next===undefined)continue;
@@ -230,9 +230,9 @@ function refreshKeyReach(){
 function setBudget() {
   const walkable=state.map.cells.filter(c=>!c).length;
   state.limit=['campaign','daily','shared'].includes(state.mode)&&(state.level>=3||state.difficulty==='hardcore')?Math.ceil(walkable*difficultyConfig().budget):null;
-  if(state.mode!=='endless'||(BigInt(state.endlessStage)<3n&&state.difficulty!=='hardcore'))return;
+  if(state.mode!=='endless'||(BigInt(state.endlessStage)<BigInt(3)&&state.difficulty!=='hardcore'))return;
   const path=solveShortest(state.map).path,trapCost=difficultyConfig().trap;
-  const traps=new Set(state.map.traps.filter(t=>!t.hardOnly||state.difficulty==='hardcore').map(t=>t.pos)),guardCells=new Set(state.map.guards.flatMap(g=>g.path));
+  const traps=new Set(state.map.traps.filter(t=>!t.hardOnly||state.difficulty==='hardcore').map(t=>t.pos)),guardCells=new Set(state.map.guards.reduce((list,g)=>list.concat(g.path),[]));
   let routeCost=path.length-1;
   for(let i=1;i<path.length;i++) {
     if(traps.has(path[i]))routeCost+=trapCost;
@@ -253,16 +253,16 @@ function grantItem(type) {
   if(type==='torch')state.torchUntil=Math.max(state.elapsed,state.torchUntil)+30000;
   if(type==='compass')state.compass=true;
   if(type==='map') {
-    const hidden=state.map.keys.find(id=>!state.collected.has(id))??state.map.exit,x=hidden%state.map.width,y=Math.floor(hidden/state.map.width);
+    const hidden0=state.map.keys.find(id=>!state.collected.has(id)),hidden=hidden0!=null?hidden0:state.map.exit,x=hidden%state.map.width,y=Math.floor(hidden/state.map.width);
     for(let yy=Math.max(0,y-5);yy<=Math.min(state.map.height-1,y+5);yy++)for(let xx=Math.max(0,x-5);xx<=Math.min(state.map.width-1,x+5);xx++)state.charted.add(yy*state.map.width+xx);
     state.mapRevealUntil=state.elapsed+6000;
   }
   tell(`获得${ITEM_NAMES[type]}。${type==='torch'?'视野扩大 3 格，增加 30 秒。':type==='map'?'远方的一片区域被点亮。':'地图边缘将指向最近的未收集钥匙。'}`);
 }
 function collectItems() {
-  const item=state.map.items?.find(i=>i.pos===state.pos&&!state.takenItems.has(i.pos));
+  const item=state.map.items&&state.map.items.find(i=>i.pos===state.pos&&!state.takenItems.has(i.pos));
   if(item){state.takenItems.add(item.pos);grantItem(item.type);sound('key');}
-  const chest=state.map.chests?.find(c=>c.pos===state.pos&&!state.openedChests.has(c.pos));
+  const chest=state.map.chests&&state.map.chests.find(c=>c.pos===state.pos&&!state.openedChests.has(c.pos));
   if(chest){state.openedChests.add(chest.pos);showToast(`宝箱开启 · ${ITEM_NAMES[chest.loot]}（撤销不会重置宝箱）`);grantItem(chest.loot);if(!['tutorial','endless'].includes(state.mode)){save.stats.chests++;if(save.stats.chests>=5)unlockAchievements(['chests5']);scheduleSave();}sound('key');}
 }
 function turnGuards(from) {
@@ -286,7 +286,7 @@ function solveShortest(map) {
       const result={steps:path.length-1,path};shortestCache.set(map,result);return result;
     }
     for(const next of neighbors[pos]) {
-      const door=map.doors?.find(d=>d.pos===next);if(door&&!(mask&(1<<door.key)))continue;
+      const door=map.doors&&map.doors.find(d=>d.pos===next);if(door&&!(mask&(1<<door.key)))continue;
       const nextMask=mask|bits[next];if(next===map.exit&&nextMask!==full)continue;
       const code=nextMask*size+next;if(parents[code]!==-2)continue;parents[code]=encoded;queue[tail++]=code;
     }
@@ -305,7 +305,7 @@ function lineOfSight(map,from,to) {
     if(nx!==x&&ny!==y&&(map.cells[y*map.width+nx]||map.cells[ny*map.width+x]))return false;
     x=nx;y=ny;
     if(x===tx&&y===ty)return true;
-    if(map.cells[y*map.width+x]||(state?.map===map&&lockedDoor(map,y*map.width+x,state.collected)))return false;
+    if(map.cells[y*map.width+x]||(state&&state.map===map&&lockedDoor(map,y*map.width+x,state.collected)))return false;
   }
   return true;
 }

@@ -7,6 +7,11 @@
 <meta name="theme-color" content="#111713">
 <title>遗迹寻钥 · 迷宫寻宝</title>
 <style>
+  /* ===== [00] 兼容性 ===== */
+  /* 关掉安卓各内核（Chrome/百度/X5 等）点按时的半透明蓝色高亮，以及 iOS 长按弹菜单 */
+  *,*::before,*::after{-webkit-tap-highlight-color:rgba(0,0,0,0);}
+  html{-webkit-touch-callout:none;}
+
   /* ===== [01] 主题变量 ===== */
   :root {
     --bg: #2e2017;
@@ -862,6 +867,7 @@
 
     .maze-stage {
       flex: none;
+      height: 460px;
       height: clamp(240px, 46dvh, 460px);
       padding: 12px;
     }
@@ -1583,6 +1589,8 @@
 
 'use strict';
 const $ = id => document.getElementById(id);
+/* Chrome 86 才有 replaceChildren；旧内核用这个等价函数，保持全浏览器可玩 */
+function setChildren(parent,children){while(parent.firstChild)parent.removeChild(parent.firstChild);for(let i=0;i<children.length;i++)parent.appendChild(children[i]);}
 const LEVELS = [
   {width:31,height:19,keys:3,name:'沉眠的门厅',intro:'门在你身后合上，锁孔里还留着旧钥匙的温度。',outro:'第一道门开了，后面还有四道。'},
   {width:35,height:23,keys:4,name:'苔痕回廊',intro:'苔藓漫过石阶，有人在这里点过火。',outro:'回廊尽头没有守卫，只有更深的回廊。'},
@@ -1657,7 +1665,7 @@ function normalizeKey(key) {return key.length===1?key.toLowerCase():key;}
 function bindableKey(key) {return typeof key==='string'&&key.length>0&&key.length<=32&&!['Tab','Escape','Control','Alt','Meta','Shift','Dead','Unidentified','Process'].includes(key);}
 function normalizeBindings(raw) {
   if(raw===undefined)return {...DEFAULT_BINDINGS};
-  const result={};for(const dir of Object.keys(DIRS)){if(!bindableKey(raw?.[dir]))throw new Error('自定义键位无效');result[dir]=normalizeKey(raw[dir]);}
+  const result={};for(const dir of Object.keys(DIRS)){if(!bindableKey(raw?raw[dir]:undefined))throw new Error('自定义键位无效');result[dir]=normalizeKey(raw[dir]);}
   if(new Set(Object.values(result)).size!==4)throw new Error('方向键位不能重复');return result;
 }
 function directionFor(key) {
@@ -1696,7 +1704,7 @@ function normalizeStats(raw) {
   if(result.streak>result.bestStreak||result.bestStreak>result.wins)throw new Error('连续通关统计无效');result.fastest=raw.fastest;
   if(!Array.isArray(raw.achievements)||raw.achievements.some(id=>!ACHIEVEMENTS.some(a=>a[0]===id)))throw new Error('成就数据无效');result.achievements=[...new Set(raw.achievements)];
   for(const key of ['sRanks','cleanRuns','chests']){if(raw[key]!==undefined&&(!Number.isSafeInteger(raw[key])||raw[key]<0))throw new Error('扩展统计无效');result[key]=raw[key]||0;}
-  if(raw.itemKinds!==undefined&&(!Array.isArray(raw.itemKinds)||raw.itemKinds.some(k=>!Object.hasOwn(ITEM_NAMES,k))))throw new Error('道具统计无效');result.itemKinds=[...new Set(raw.itemKinds||[])];
+  if(raw.itemKinds!==undefined&&(!Array.isArray(raw.itemKinds)||raw.itemKinds.some(k=>!Object.prototype.hasOwnProperty.call(ITEM_NAMES,k))))throw new Error('道具统计无效');result.itemKinds=[...new Set(raw.itemKinds||[])];
   if(raw.recent!==undefined&&(!Array.isArray(raw.recent)||raw.recent.length>24||raw.recent.some(r=>!r||!Number.isInteger(r.level)||r.level<1||r.level>15||!Number.isInteger(r.steps)||r.steps<1)))throw new Error('趋势记录无效');result.recent=(raw.recent||[]).map(r=>({level:r.level,steps:r.steps}));
   return result;
 }
@@ -1707,9 +1715,9 @@ function recordStatistics() {
   if(state.mode==='tutorial')return;
   if(state.mode==='endless') {
     if(BigInt(state.endlessStage)>BigInt(save.endless.highestStage))save.endless.highestStage=state.endlessStage;
-    save.endless.wins=(BigInt(save.endless.wins)+1n).toString();writeSave();return;
+    save.endless.wins=(BigInt(save.endless.wins)+BigInt(1)).toString();writeSave();return;
   }
-  const stats=save.stats;stats.wins++;stats.streak++;stats.bestStreak=Math.max(stats.bestStreak,stats.streak);stats.fastest=Math.min(stats.fastest??Infinity,state.elapsed);
+  const stats=save.stats;stats.wins++;stats.streak++;stats.bestStreak=Math.max(stats.bestStreak,stats.streak);stats.fastest=Math.min(stats.fastest!=null?stats.fastest:Infinity,state.elapsed);
   const grade=gradeRun(state.moves,state.optimal),earned=['first'];
   if(grade==='S'){stats.sRanks++;earned.push('rankS');}if(['S','A'].includes(grade))earned.push('rankA');
   if(!state.undoUses)earned.push('noUndo');if(!state.hints){stats.cleanRuns++;earned.push('noHint');}
@@ -1722,7 +1730,7 @@ function recordStatistics() {
 function showStatistics() {
   $('endless-summary').textContent=`无尽模式 · 最高通关：${save.endless.highestStage==='0'?'尚未通关':'第 '+save.endless.highestStage+' 关'} · 累计通关：${save.endless.wins} 次（独立统计）`;
   const stats=save.stats;$('stats-summary').textContent=`总步数：${stats.totalSteps}　总通关：${stats.wins}　最快：${stats.fastest===null?'暂无':formatTime(stats.fastest)}　最长连续通关：${stats.bestStreak}`;
-  $('achievement-list').replaceChildren(...ACHIEVEMENTS.map(([id,title])=>{const li=document.createElement('li');li.textContent=(stats.achievements.includes(id)?'已达成 · ':'未达成 · ')+title;li.style.color=stats.achievements.includes(id)?'var(--gold)':'var(--muted)';return li;}));$('stats-dialog').showModal();const streak=dailyStreak();$('daily-streak').textContent=`每日挑战 · 当前连续 ${streak.current} 天 / 历史最长 ${streak.best} 天（通关记打卡，断一天归零）`;drawStatistics();
+  setChildren($('achievement-list'),ACHIEVEMENTS.map(([id,title])=>{const li=document.createElement('li');li.textContent=(stats.achievements.includes(id)?'已达成 · ':'未达成 · ')+title;li.style.color=stats.achievements.includes(id)?'var(--gold)':'var(--muted)';return li;}));$('stats-dialog').showModal();const streak=dailyStreak();$('daily-streak').textContent=`每日挑战 · 当前连续 ${streak.current} 天 / 历史最长 ${streak.best} 天（通关记打卡，断一天归零）`;drawStatistics();
 }
 function drawStatistics() {
   const canvas=$('stats-chart'),width=Math.max(240,canvas.clientWidth),height=180,ratio=Math.min(devicePixelRatio||1,2),ctx=canvas.getContext('2d'),style=getComputedStyle(document.documentElement),values=save.stats.recent;
@@ -1748,12 +1756,13 @@ function normalizeEndless(raw) {
 function normalizeSave(raw) {
   if(!raw||raw.version!==1||!Number.isInteger(raw.current)||raw.current<1||raw.current>LEVELS.length||!Number.isInteger(raw.unlocked)||raw.unlocked<raw.current||raw.unlocked>LEVELS.length)throw new Error('存档格式无效');
   const bests={};
-  for(let level=1;level<=LEVELS.length;level++) {const b=raw.bests?.[level];if(b){if(!Number.isInteger(b.steps)||b.steps<1||!Number.isFinite(b.time)||b.time<0)throw new Error('成绩无效');if(b.lastHints!==undefined&&(!Number.isInteger(b.lastHints)||b.lastHints<0))throw new Error('提示次数无效');bests[level]={steps:b.steps,time:b.time,lastHints:b.lastHints||0,lastGrade:['S','A','B','C'].includes(b.lastGrade)?b.lastGrade:null};}}
+  for(let level=1;level<=LEVELS.length;level++) {const b=raw.bests?raw.bests[level]:undefined;if(b){if(!Number.isInteger(b.steps)||b.steps<1||!Number.isFinite(b.time)||b.time<0)throw new Error('成绩无效');if(b.lastHints!==undefined&&(!Number.isInteger(b.lastHints)||b.lastHints<0))throw new Error('提示次数无效');bests[level]={steps:b.steps,time:b.time,lastHints:b.lastHints||0,lastGrade:['S','A','B','C'].includes(b.lastGrade)?b.lastGrade:null};}}
   const daily={};
   for(const [date,record] of Object.entries(raw.daily||{})) {if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isInteger(record.steps)||record.steps<1||!Number.isFinite(record.time)||record.time<0)throw new Error('每日成绩无效');if(record.hints!==undefined&&(!Number.isInteger(record.hints)||record.hints<0))throw new Error('每日提示次数无效');daily[date]={steps:record.steps,time:record.time,hints:record.hints||0};}
   if(raw.tutorialDone!==undefined&&typeof raw.tutorialDone!=='boolean')throw new Error('教程状态无效');
-  for(const key of ['muted','contrast','large'])if(raw.prefs?.[key]!==undefined&&typeof raw.prefs[key]!=='boolean')throw new Error('偏好设置无效');
-  return {version:1,mapGen:raw.mapGen===2?2:1,current:raw.current,unlocked:raw.unlocked,bests,daily,stats:normalizeStats(raw.stats),endless:normalizeEndless(raw.endless),tutorialDone:raw.tutorialDone===true,prefs:{difficulty:Object.hasOwn(DIFFICULTIES,raw.prefs?.difficulty)?raw.prefs.difficulty:'standard',keyMode:['both','arrows','wasd','custom'].includes(raw.prefs?.keyMode)?raw.prefs.keyMode:'both',bindings:normalizeBindings(raw.prefs?.bindings),muted:raw.prefs?.muted===true,music:raw.prefs?.music!==false,sideFs:Number.isInteger(raw.prefs?.sideFs)?Math.max(10,Math.min(17,raw.prefs.sideFs)):12,contrast:raw.prefs?.contrast===true,large:raw.prefs?.large===true,skin:['ruins','forest','space','purple','emerald'].includes(raw.prefs?.skin)?raw.prefs.skin:'ruins',avatarSkin:['original','red','orange','yellow','green','blue','indigo','violet'].includes(raw.prefs?.avatarSkin)?raw.prefs.avatarSkin:'original'}};
+  for(const key of ['muted','contrast','large'])if(raw.prefs&&raw.prefs[key]!==undefined&&typeof raw.prefs[key]!=='boolean')throw new Error('偏好设置无效');
+  const prefs=raw.prefs||{};
+  return {version:1,mapGen:raw.mapGen===2?2:1,current:raw.current,unlocked:raw.unlocked,bests,daily,stats:normalizeStats(raw.stats),endless:normalizeEndless(raw.endless),tutorialDone:raw.tutorialDone===true,prefs:{difficulty:Object.prototype.hasOwnProperty.call(DIFFICULTIES,prefs.difficulty)?prefs.difficulty:'standard',keyMode:['both','arrows','wasd','custom'].includes(prefs.keyMode)?prefs.keyMode:'both',bindings:normalizeBindings(prefs.bindings),muted:prefs.muted===true,music:prefs.music!==false,sideFs:Number.isInteger(prefs.sideFs)?Math.max(10,Math.min(17,prefs.sideFs)):12,contrast:prefs.contrast===true,large:prefs.large===true,skin:['ruins','forest','space','purple','emerald'].includes(prefs.skin)?prefs.skin:'ruins',avatarSkin:['original','red','orange','yellow','green','blue','indigo','violet'].includes(prefs.avatarSkin)?prefs.avatarSkin:'original'}};
 }
 function readSave() {
   try {const text=localStorage.getItem(SAVE_KEY);if(text)return normalizeSave(JSON.parse(text));}
@@ -1819,7 +1828,7 @@ function toggleMute() {
   const enabled=isSoundMuted();soundOptIn=true;save.prefs.muted=!enabled;
   if(enabled)save.prefs.music=true;
   writeSave();applyPreferences();
-  if(enabled){initAudio();startBgm();}else{stopBgm();audioContext?.suspend().catch(()=>{});}
+  if(enabled){initAudio();startBgm();}else{stopBgm();if(audioContext)audioContext.suspend().catch(()=>{});}
 }
 function setMusicEnabled(enabled) {
   save.prefs.music=enabled;
@@ -1830,7 +1839,7 @@ function setMusicEnabled(enabled) {
 /* ===== [J2] 每日挑战 ===== */
 /* 返回本地日期（本地时间 0 点换日），不再用 UTC */
 function todayUTC() {const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-function dailyDate(seed) {return /^L3-daily-(\d{4}-\d{2}-\d{2})$/.exec(seed)?.[1]||null;}
+function dailyDate(seed) {const match=/^L3-daily-(\d{4}-\d{2}-\d{2})$/.exec(seed);return (match&&match[1])||null;}
 function dailyStreak(records=save.daily,today=todayUTC()) {
   const days=Object.keys(records).map(date=>Date.parse(date+'T00:00:00Z')/86400000).sort((a,b)=>a-b);let run=0,best=0,last=-Infinity;
   for(const day of days){run=day===last+1?run+1:1;best=Math.max(best,run);last=day;}
@@ -1841,11 +1850,11 @@ function startDaily() {const date=todayUTC();loadLevel(3,null,'daily','L3-daily-
 function recordLevel() {
   if(state.mode==='daily') {const date=dailyDate(state.seed);if(date&&!save.daily[date]){save.daily[date]={steps:state.moves,time:state.elapsed,hints:state.hints};writeSave();}updateDailyStatus();return;}
   if(state.mode!=='campaign')return;
-  const old=save.bests[state.level];save.bests[state.level]={steps:Math.min(old?.steps??Infinity,state.moves),time:Math.min(old?.time??Infinity,state.elapsed),lastHints:state.hints,lastGrade:gradeRun(state.moves,state.optimal)};
+  const old=save.bests[state.level];save.bests[state.level]={steps:Math.min(old&&old.steps!=null?old.steps:Infinity,state.moves),time:Math.min(old&&old.time!=null?old.time:Infinity,state.elapsed),lastHints:state.hints,lastGrade:gradeRun(state.moves,state.optimal)};
   save.unlocked=Math.max(save.unlocked,Math.min(LEVELS.length,state.level+1));writeSave();
 }
 function showLevels() {
-  $('level-list').replaceChildren(...CHAPTERS.map((chapter,chapterIndex)=>{
+  setChildren($('level-list'),CHAPTERS.map((chapter,chapterIndex)=>{
     const section=document.createElement('section');section.className='chapter';
     const eyebrow=document.createElement('p');eyebrow.className='eyebrow';eyebrow.textContent=chapter.tag;
     const title=document.createElement('h3');title.textContent=chapter.name;
@@ -1870,7 +1879,7 @@ function seededRandom(seed) {
 }
 function freshSeed(level) {return `L${level}-`+Array.from(crypto.getRandomValues(new Uint32Array(2)),n=>n.toString(36)).join('');}
 function endlessConfig(stage,difficulty,seed) {
-  const depth=Number(BigInt(stage)>60n?60n:BigInt(stage)),growth=(depth-1)/59,base=DIFFICULTIES[difficulty];
+  const depth=Number(BigInt(stage)>BigInt(60)?BigInt(60):BigInt(stage)),growth=(depth-1)/59,base=DIFFICULTIES[difficulty];
   const intros=['风从未知的回廊吹来，新的钥匙藏在岔路深处。','灯火照亮一段陌生石阶，每一道锁都在等待它的钥匙。','墙后的水声忽远忽近，沿着自己的脚步寻找出口。','新的门厅在迷雾中展开，记住走过的路，再向深处出发。','石墙上的刻痕指向远方，真正的方向要由你来寻找。','一阵回声穿过空荡的地宫，下一道门仍未开启。'];
   const outros=['这一层的石门已经打开，新的迷宫正在前方等待。','你留下了一串脚印，带着新的方向继续深入。','锁舌轻响，回廊向更深处延伸。','这一层的谜题已解开，下一次寻宝即将开始。'];
   const random=seededRandom(seed+'-story');
@@ -1942,7 +1951,7 @@ function validateMap(input) {
       if(!value||!valid(value.pos)||occupied.has(value.pos))throw new Error('地城元素位置无效或重叠');occupied.add(value.pos);
       if(field==='doors'){if(!Number.isInteger(value.key)||value.key<0||value.key>=map.keys.length)throw new Error('门的钥匙编号无效');return {pos:value.pos,key:value.key};}
       if(field==='traps')return {pos:value.pos,hardOnly:value.hardOnly===true};
-      const type=field==='items'?value.type:value.loot;if(!Object.hasOwn(ITEM_NAMES,type))throw new Error('道具类型无效');return field==='items'?{pos:value.pos,type}:{pos:value.pos,loot:type};
+      const type=field==='items'?value.type:value.loot;if(!Object.prototype.hasOwnProperty.call(ITEM_NAMES,type))throw new Error('道具类型无效');return field==='items'?{pos:value.pos,type}:{pos:value.pos,loot:type};
     });
   }
   if(input.guards!==undefined){if(!Array.isArray(input.guards)||input.guards.length>12)throw new Error('守卫数量无效');map.guards=input.guards.map(g=>{if(!g||!Array.isArray(g.path)||g.path.length<2||g.path.length>100||g.path.some((id,i)=>!valid(id)||occupied.has(id)||!adjacent(map,id).includes(g.path[(i+1)%g.path.length])))throw new Error('守卫巡逻路线无效');return {path:[...g.path]};});}
@@ -1974,7 +1983,7 @@ function paintCell(id) {
   const tool=$('editor-tool').value;
   if(tool==='key'&&!draft.keys.includes(id)&&draft.keys.length>=8){$('editor-validation').textContent='最多放置 8 把钥匙；请先擦除一把。';return;}
   const removedKey=draft.keys.indexOf(id);
-  if(removedKey>=0)draft.doors=draft.doors?.filter(d=>d.key!==removedKey).map(d=>({...d,key:d.key>removedKey?d.key-1:d.key}));
+  if(removedKey>=0)draft.doors=draft.doors?draft.doors.filter(d=>d.key!==removedKey).map(d=>({...d,key:d.key>removedKey?d.key-1:d.key})):undefined;
   for(const field of ['doors','items','traps','chests'])if(draft[field])draft[field]=draft[field].filter(v=>v.pos!==id);
   if(draft.guards)draft.guards=draft.guards.filter(g=>!g.path.includes(id));
   draft.keys=draft.keys.filter(key=>key!==id);if(draft.start===id)draft.start=null;if(draft.exit===id)draft.exit=null;
@@ -2040,7 +2049,7 @@ function generateMap(width,height,keyCount,random=Math.random,braidRate=0.10,key
   }
   return map;
 }
-function lockedDoor(map,id,collected) {return map.doors?.find(d=>d.pos===id&&!collected.has(map.keys[d.key]));}
+function lockedDoor(map,id,collected) {return map.doors&&map.doors.find(d=>d.pos===id&&!collected.has(map.keys[d.key]));}
 function canCompleteMap(map) {
   const found=new Set();let previous=-1;
   while(previous!==found.size){previous=found.size;const paths=pathsFrom(map,map.start,true,found);for(const key of map.keys)if(paths.distances[key]>=0)found.add(key);}
@@ -2051,7 +2060,7 @@ function addDungeon(map,random,level,diffCfg) {
   map.doors=[];map.items=[];map.traps=[];map.chests=[];map.guards=[];
   const occupied=new Set([map.start,map.exit,...map.keys]);
   for(let key=0;key<map.keys.length;key++) {
-    const target=map.keys[key+1]??map.exit,paths=pathsFrom(map,map.start),route=[];
+    const target=map.keys[key+1]!=null?map.keys[key+1]:map.exit,paths=pathsFrom(map,map.start),route=[];
     for(let id=target;id!==map.start;id=paths.previous[id])route.push(id);
     for(const pos of route) {
       if(occupied.has(pos)||paths.distances[pos]<4)continue;
@@ -2071,10 +2080,10 @@ function addDungeon(map,random,level,diffCfg) {
   const all=pathsFrom(map,map.start).queue.filter(id=>!occupied.has(id));
   const take=pool=>{const choices=pool.filter(id=>!occupied.has(id));if(!choices.length)return null;const id=choices[Math.floor(random()*choices.length)];occupied.add(id);return id;};
   for(const type of ['torch','map','compass','torch']){const pos=take(free);if(pos!==null)map.items.push({pos,type});}
-  for(let i=0,chestCount=diffCfg?.chestCount??(2+Math.floor(level/5));i<chestCount;i++){const pos=take(all);if(pos!==null)map.chests.push({pos,loot:['torch','map','compass'][Math.floor(random()*3)]});}
-  for(let i=0,trapCount=diffCfg?.trapCount??Math.round((2+Math.ceil(level/3))*trapMul);i<trapCount;i++){const pos=take(all);if(pos!==null)map.traps.push({pos,hardOnly:i%2===1});}
+  for(let i=0,chestCount=diffCfg&&diffCfg.chestCount!=null?diffCfg.chestCount:2+Math.floor(level/5);i<chestCount;i++){const pos=take(all);if(pos!==null)map.chests.push({pos,loot:['torch','map','compass'][Math.floor(random()*3)]});}
+  for(let i=0,trapCount=diffCfg&&diffCfg.trapCount!=null?diffCfg.trapCount:Math.round((2+Math.ceil(level/3))*trapMul);i<trapCount;i++){const pos=take(all);if(pos!==null)map.traps.push({pos,hardOnly:i%2===1});}
   const startDistances=pathsFrom(map,map.start).distances;
-  for(let i=0,guardCount=diffCfg?.guardCount??Math.round(Math.min(2,1+Math.floor(level/7))*guardMul);i<guardCount;i++) {
+  for(let i=0,guardCount=diffCfg&&diffCfg.guardCount!=null?diffCfg.guardCount:Math.round(Math.min(2,1+Math.floor(level/7))*guardMul);i<guardCount;i++) {
     const candidates=all.filter(id=>!occupied.has(id)&&startDistances[id]>12);
     const start=take(candidates);if(start===null)break;
     const next=adjacent(map,start).find(id=>!map.cells[id]&&!occupied.has(id));if(next===undefined)continue;
@@ -2150,9 +2159,9 @@ function refreshKeyReach(){
 function setBudget() {
   const walkable=state.map.cells.filter(c=>!c).length;
   state.limit=['campaign','daily','shared'].includes(state.mode)&&(state.level>=3||state.difficulty==='hardcore')?Math.ceil(walkable*difficultyConfig().budget):null;
-  if(state.mode!=='endless'||(BigInt(state.endlessStage)<3n&&state.difficulty!=='hardcore'))return;
+  if(state.mode!=='endless'||(BigInt(state.endlessStage)<BigInt(3)&&state.difficulty!=='hardcore'))return;
   const path=solveShortest(state.map).path,trapCost=difficultyConfig().trap;
-  const traps=new Set(state.map.traps.filter(t=>!t.hardOnly||state.difficulty==='hardcore').map(t=>t.pos)),guardCells=new Set(state.map.guards.flatMap(g=>g.path));
+  const traps=new Set(state.map.traps.filter(t=>!t.hardOnly||state.difficulty==='hardcore').map(t=>t.pos)),guardCells=new Set(state.map.guards.reduce((list,g)=>list.concat(g.path),[]));
   let routeCost=path.length-1;
   for(let i=1;i<path.length;i++) {
     if(traps.has(path[i]))routeCost+=trapCost;
@@ -2173,16 +2182,16 @@ function grantItem(type) {
   if(type==='torch')state.torchUntil=Math.max(state.elapsed,state.torchUntil)+30000;
   if(type==='compass')state.compass=true;
   if(type==='map') {
-    const hidden=state.map.keys.find(id=>!state.collected.has(id))??state.map.exit,x=hidden%state.map.width,y=Math.floor(hidden/state.map.width);
+    const hidden0=state.map.keys.find(id=>!state.collected.has(id)),hidden=hidden0!=null?hidden0:state.map.exit,x=hidden%state.map.width,y=Math.floor(hidden/state.map.width);
     for(let yy=Math.max(0,y-5);yy<=Math.min(state.map.height-1,y+5);yy++)for(let xx=Math.max(0,x-5);xx<=Math.min(state.map.width-1,x+5);xx++)state.charted.add(yy*state.map.width+xx);
     state.mapRevealUntil=state.elapsed+6000;
   }
   tell(`获得${ITEM_NAMES[type]}。${type==='torch'?'视野扩大 3 格，增加 30 秒。':type==='map'?'远方的一片区域被点亮。':'地图边缘将指向最近的未收集钥匙。'}`);
 }
 function collectItems() {
-  const item=state.map.items?.find(i=>i.pos===state.pos&&!state.takenItems.has(i.pos));
+  const item=state.map.items&&state.map.items.find(i=>i.pos===state.pos&&!state.takenItems.has(i.pos));
   if(item){state.takenItems.add(item.pos);grantItem(item.type);sound('key');}
-  const chest=state.map.chests?.find(c=>c.pos===state.pos&&!state.openedChests.has(c.pos));
+  const chest=state.map.chests&&state.map.chests.find(c=>c.pos===state.pos&&!state.openedChests.has(c.pos));
   if(chest){state.openedChests.add(chest.pos);showToast(`宝箱开启 · ${ITEM_NAMES[chest.loot]}（撤销不会重置宝箱）`);grantItem(chest.loot);if(!['tutorial','endless'].includes(state.mode)){save.stats.chests++;if(save.stats.chests>=5)unlockAchievements(['chests5']);scheduleSave();}sound('key');}
 }
 function turnGuards(from) {
@@ -2206,7 +2215,7 @@ function solveShortest(map) {
       const result={steps:path.length-1,path};shortestCache.set(map,result);return result;
     }
     for(const next of neighbors[pos]) {
-      const door=map.doors?.find(d=>d.pos===next);if(door&&!(mask&(1<<door.key)))continue;
+      const door=map.doors&&map.doors.find(d=>d.pos===next);if(door&&!(mask&(1<<door.key)))continue;
       const nextMask=mask|bits[next];if(next===map.exit&&nextMask!==full)continue;
       const code=nextMask*size+next;if(parents[code]!==-2)continue;parents[code]=encoded;queue[tail++]=code;
     }
@@ -2225,7 +2234,7 @@ function lineOfSight(map,from,to) {
     if(nx!==x&&ny!==y&&(map.cells[y*map.width+nx]||map.cells[ny*map.width+x]))return false;
     x=nx;y=ny;
     if(x===tx&&y===ty)return true;
-    if(map.cells[y*map.width+x]||(state?.map===map&&lockedDoor(map,y*map.width+x,state.collected)))return false;
+    if(map.cells[y*map.width+x]||(state&&state.map===map&&lockedDoor(map,y*map.width+x,state.collected)))return false;
   }
   return true;
 }
@@ -2268,12 +2277,12 @@ function tileAt(view,id) {
   if(!view.isReplay&&hintCells.has(id))return {char:'*',type:'hint'};
   if(!view.seen.has(id))return {char:' ',type:'unseen'};
   let char=view.map.cells[id]?'#':'·',type=view.map.cells[id]?'wall':view.visited.has(id)?'visited':'floor';
-  const door=view.map.doors?.find(d=>d.pos===id),item=view.map.items?.find(i=>i.pos===id&&!view.takenItems?.has(id)),chest=view.map.chests?.find(c=>c.pos===id),trap=view.map.traps?.find(t=>t.pos===id&&(!t.hardOnly||view.difficulty==='hardcore'));
+  const door=view.map.doors&&view.map.doors.find(d=>d.pos===id),item=view.map.items&&view.map.items.find(i=>i.pos===id&&!(view.takenItems&&view.takenItems.has(id))),chest=view.map.chests&&view.map.chests.find(c=>c.pos===id),trap=view.map.traps&&view.map.traps.find(t=>t.pos===id&&(!t.hardOnly||view.difficulty==='hardcore'));
   if(trap){char='△';type='trap';}
   if(item){char={torch:'T',map:'M',compass:'C'}[item.type];type='item';}
-  if(chest){char=view.openedChests?.has(id)?'□':'▣';type=view.openedChests?.has(id)?'floor':'chest';}
+  if(chest){char=view.openedChests&&view.openedChests.has(id)?'□':'▣';type=view.openedChests&&view.openedChests.has(id)?'floor':'chest';}
   if(door){char=LOCK_SIGNS[door.key];type=view.collected.has(view.map.keys[door.key])?'gate-open':'gate';}
-  if(view.guards?.some((g,i)=>view.map.guards[i].path[g.index]===id)){char='G';type='guard';}
+  if(view.guards&&view.guards.some((g,i)=>view.map.guards[i].path[g.index]===id)){char='G';type='guard';}
   if(view.isReplay&&view.visited.has(id)){char='*';type='key';}
   if(view.map.keys.includes(id)&&!view.collected.has(id)){char=String(view.map.keys.indexOf(id)+1);type='key';}
   if(id===view.map.exit){char='E';type=view.collected.size===view.map.keys.length?'door open':'door';}
@@ -2345,7 +2354,7 @@ let drawCache={map:null,key:'',tiles:new Int32Array()};
 const TILE_TYPES={unseen:0,wall:1,floor:2,visited:3,key:4,door:5,'door open':6,remembered:7,'remembered-wall':9,'remembered-floor':10,hint:8,gate:11,'gate-open':12,item:13,trap:14,chest:15,guard:16};
 /* ===== [J8] 渲染 ===== */
 function render() {
-  const started=performance.now(),view=replay?.view||state;
+  const started=performance.now(),view=replay&&replay.view||state;
   fitCell(view.map);
   const canvas=$('maze'),cell=cellMetrics(),ratio=Math.min(window.devicePixelRatio||1,2);
   const width=view.map.width*cell.width,height=view.map.height*cell.height;
@@ -2408,9 +2417,9 @@ function renderMinimap(view) {
 }
 function renderHUD() {
   $('steps').textContent=state.moves;$('timer').textContent=formatTime(state.elapsed);$('collected').textContent=`${state.collected.size} / ${state.map.keys.length}`;
-  if($('keys').children.length!==state.map.keys.length)$('keys').replaceChildren(...state.map.keys.map((_,i)=>{const el=document.createElement('span');el.className='key-slot';el.textContent=i+1;return el;}));
+  if($('keys').children.length!==state.map.keys.length)setChildren($('keys'),state.map.keys.map((_,i)=>{const el=document.createElement('span');el.className='key-slot';el.textContent=i+1;return el;}));
   [...$('keys').children].forEach((el,i)=>{const got=state.collected.has(state.map.keys[i]),blocked=!got&&state.keyReach&&!state.keyReach.has(i);el.classList.toggle('found',got);el.classList.toggle('locked',blocked);el.setAttribute('aria-label',`钥匙 ${i+1} ${got?'已收集':blocked?'被锁门挡住，暂时拿不到':'未收集'}`);});
-  const view=replay?.view||state;$('board-meta').textContent=`${view.map.width} × ${view.map.height}`;
+  const view=replay&&replay.view||state;$('board-meta').textContent=`${view.map.width} × ${view.map.height}`;
   $('level-title').textContent=replay?`${lastWin.mode==='endless'?'无尽模式 · ':''}第 ${lastWin.endlessStage||lastWin.level} 关路线回放 · ${replay.index} / ${lastWin.route.length-1}`:state.mode==='endless'?`无尽模式 · 第 ${state.endlessStage} 关`:state.mode==='daily'?`${dailyDate(state.seed)} 每日挑战（本地时间 0 点换日）`:state.mode==='custom'?'自定义关卡':state.mode==='tutorial'?'三步引导':`第 ${Math.ceil(state.level/5)} 章 · ${state.level} / ${LEVELS.length} 关 · ${LEVELS[state.level-1].name}`;
   const endlessButton=$('endless'),endlessLabel=state.mode==='endless'?'退出无尽':'无尽模式';
   if(endlessButton.textContent!==endlessLabel)endlessButton.textContent=endlessLabel;
@@ -2419,7 +2428,7 @@ function renderHUD() {
   const unlocked=state.collected.size===state.map.keys.length;
   $('objective').textContent=unlocked?'出口发出绿光，前往 E 处通关。':'数字钥匙开启相同编号的锁门；集齐后前往 E。';
   const torchSeconds=Math.ceil(Math.max(0,state.torchUntil-state.elapsed)/1000);
-  $('inventory').textContent=`${torchSeconds?'火把 '+torchSeconds+' 秒':'火把：未点燃'} · ${state.compass?'罗盘已启用':'罗盘：未找到'} · 宝箱 ${state.openedChests.size}/${state.map.chests?.length||0}`;
+  $('inventory').textContent=`${torchSeconds?'火把 '+torchSeconds+' 秒':'火把：未点燃'} · ${state.compass?'罗盘已启用':'罗盘：未找到'} · 宝箱 ${state.openedChests.size}/${state.map.chests&&state.map.chests.length||0}`;
   $('difficulty').disabled=!!replay||state.mode==='tutorial';$('pause').disabled=!!replay||!['ready','playing'].includes(state.status);
   const remaining=view.map.keys.filter(id=>!view.collected.has(id));$('compass').hidden=!state.compass||!remaining.length||!!replay;
   if(!$('compass').hidden){const target=remaining.reduce((a,b)=>Math.hypot(a%view.map.width-view.pos%view.map.width,Math.floor(a/view.map.width)-Math.floor(view.pos/view.map.width))<Math.hypot(b%view.map.width-view.pos%view.map.width,Math.floor(b/view.map.width)-Math.floor(view.pos/view.map.width))?a:b);const angle=Math.atan2(Math.floor(target/view.map.width)-Math.floor(view.pos/view.map.width),target%view.map.width-view.pos%view.map.width)*180/Math.PI;$('compass').innerHTML=`<b style="transform:rotate(${angle}deg)">→</b>钥匙 ${view.map.keys.indexOf(target)+1}`;}
@@ -2429,12 +2438,12 @@ function renderHUD() {
 }
 function centerPlayer() {
   const stage=$('maze-stage'),style=getComputedStyle(document.documentElement),cw=parseFloat(style.getPropertyValue('--cell')),rh=parseFloat(style.getPropertyValue('--row'));
-  const view=replay?.view||state;
+  const view=replay&&replay.view||state;
   const x=(view.pos%view.map.width)*cw,y=Math.floor(view.pos/view.map.width)*rh;
   if(x<stage.scrollLeft+cw||x>stage.scrollLeft+stage.clientWidth-cw*3)stage.scrollLeft=Math.max(0,x-stage.clientWidth/2);
   if(y<stage.scrollTop+rh||y>stage.scrollTop+stage.clientHeight-rh*3)stage.scrollTop=Math.max(0,y-stage.clientHeight/2);
 }
-function tick() {const now=performance.now();if(state?.status==='playing'&&!replay&&!document.hidden&&!document.querySelector('dialog[open]')){state.elapsed+=now-lastTick;updateVision();}lastTick=now;if(state)$('timer').textContent=formatTime(state.elapsed);}
+function tick() {const now=performance.now();if(state&&state.status==='playing'&&!replay&&!document.hidden&&!document.querySelector('dialog[open]')){state.elapsed+=now-lastTick;updateVision();}lastTick=now;if(state)$('timer').textContent=formatTime(state.elapsed);}
 function bump(message) {tell(message);$('maze-frame').classList.remove('flash');void $('maze-frame').offsetWidth;$('maze-frame').classList.add('flash');}
 function finishLevel() {
   tick();state.status='won';sound('win');recordLevel();recordStatistics();
@@ -2442,7 +2451,7 @@ function finishLevel() {
   $('victory-grade').textContent=lastWin.grade;
   $('victory-title').textContent=`${state.mode==='endless'?'无尽模式 · ':''}第 ${state.endlessStage||state.level} 关寻宝成功`;
   $('win-stats').textContent=`${lastWin.grade} 级 · 实走 ${state.moves} 步 / 理论最短 ${state.optimal} 步（${(state.moves/state.optimal).toFixed(2)}×） · ${formatTime(state.elapsed)} · 提示 ${state.hints} 次 · 撤销 ${state.undoUses} 次`;
-  const next=state.mode==='endless'?(BigInt(state.endlessStage)+1n).toString():state.mode==='campaign'&&state.level<LEVELS.length?state.level+1:null;
+  const next=state.mode==='endless'?(BigInt(state.endlessStage)+BigInt(1)).toString():state.mode==='campaign'&&state.level<LEVELS.length?state.level+1:null;
   $('victory-description').textContent=state.outro;
   $('continue').textContent=next?`继续第 ${next} 关`:'再玩一次';
   if(state.mode==='campaign'&&state.level===15&&LEVELS.every((_,i)=>save.bests[i+1]))showEnding();else $('victory').showModal();
@@ -2467,7 +2476,7 @@ function move(direction) {
   state.visited.add(state.pos);
   if(picked!==null){state.collected.add(picked);const unlockedIndex=state.map.keys.indexOf(picked);const openedDoors=(state.map.doors||[]).filter(d=>d.key===unlockedIndex);openedDoors.forEach(d=>{if(state.visible.has(d.pos))showEffect(d.pos,'collect-flash');});refreshKeyReach();sound('key');tell(`拿到 ${unlockedIndex+1} 号钥匙${openedDoors.length?`，${unlockedIndex+1} 号锁门已解锁！`:'。'}${state.collected.size===state.map.keys.length?'出口已开启。':''}`);}else if(state.pos!==from)tell('留意数字钥匙与同编号锁门，守卫每步巡逻一次。');
   collectItems();
-  const trap=state.map.traps?.find(t=>t.pos===state.pos&&(!t.hardOnly||state.difficulty==='hardcore'));
+  const trap=state.map.traps&&state.map.traps.find(t=>t.pos===state.pos&&(!t.hardOnly||state.difficulty==='hardcore'));
   if(trap){state.steps+=difficultyConfig().trap;state.trapHits++;bump(`踩中陷阱：额外扣 ${difficultyConfig().trap} 步预算。`);}
   snapshot.revealed=updateVision();state.history.push(snapshot);state.trace.push(traceStep());
   if(picked!==null)showEffect(picked,'collect-flash');
@@ -2506,15 +2515,15 @@ function togglePause() {
   tick();stopMovement();gesture=null;document.body.classList.add('paused');$('pause-dialog').showModal();$('phase').textContent='已暂停';pauseBgm();
 }
 function onKey(event) {
-  if(event.altKey||event.ctrlKey||event.metaKey||event.isComposing||event.target.closest?.('input,textarea,select,[contenteditable="true"]')||document.querySelector('dialog[open]'))return;
-  if([' ','Enter'].includes(event.key)&&event.target.closest?.('button,a'))return;
+  if(event.altKey||event.ctrlKey||event.metaKey||event.isComposing||event.target.closest&&event.target.closest('input,textarea,select,[contenteditable="true"]')||document.querySelector('dialog[open]'))return;
+  if([' ','Enter'].includes(event.key)&&event.target.closest&&event.target.closest('button,a'))return;
   const direction=directionFor(event.key);if(direction){event.preventDefault();stopAutoWalk();if(!event.repeat)beginMovement(direction,'key:'+normalizeKey(event.key));return;}
   if(event.key.toLowerCase()==='p'){event.preventDefault();togglePause();return;}
   if(event.key.toLowerCase()==='h'){event.preventDefault();showHint();return;}
   if(event.key==='Backspace'){event.preventDefault();undo();}
 }
 document.addEventListener('keydown',onKey);
-document.addEventListener('keyup',event=>{if(moveHold?.source==='key:'+normalizeKey(event.key))stopMovement();});
+document.addEventListener('keyup',event=>{if(moveHold&&moveHold.source==='key:'+normalizeKey(event.key))stopMovement();});
 window.addEventListener('blur',stopMovement);
 document.addEventListener('pointerdown',event=>{if(!event.target.closest('#maze-stage,.dpad'))stopMovement();});
 document.querySelectorAll('[data-direction]').forEach(button=>{
@@ -2534,7 +2543,7 @@ $('maze-stage').addEventListener('pointermove',event=>{
   const direction=Math.abs(dx)>Math.abs(dy)?dx>0?'right':'left':dy>0?'down':'up';
   if(direction!==gesture.direction){gesture.direction=direction;beginMovement(direction,'gesture:'+event.pointerId);}
 });
-for(const type of ['pointerup','pointercancel','lostpointercapture'])$('maze-stage').addEventListener(type,event=>{if(gesture?.id===event.pointerId){gesture=null;stopMovement();}});
+for(const type of ['pointerup','pointercancel','lostpointercapture'])$('maze-stage').addEventListener(type,event=>{if(gesture&&gesture.id===event.pointerId){gesture=null;stopMovement();}});
 $('maze-stage').addEventListener('contextmenu',event=>event.preventDefault());
 $('pause').onclick=togglePause;$('resume').onclick=togglePause;
 $('pause-dialog').addEventListener('close',()=>{lastTick=performance.now();document.body.classList.remove('paused');renderHUD();resumeBgm();$('maze').focus({preventScroll:true});});
@@ -2555,7 +2564,7 @@ updateMenu();narrowScreen.addEventListener('change',updateMenu);
 updateGameLayout();landscapeScreen.addEventListener('change',updateGameLayout);
 $('topbar').addEventListener('click',event=>{if(narrowScreen.matches&&event.target.closest('button'))$('game-menu').open=false;});
 const touchScreen=matchMedia('(any-pointer:coarse)'),portraitScreen=matchMedia('(orientation:portrait)'),fullscreenDisplay=matchMedia('(display-mode:fullscreen)');
-let autoFullscreenPending=true,fullscreenBusy=false,hadFullscreen=false;
+let fullscreenBusy=false;
 function updateFullscreenButton() {
   const active=!!document.fullscreenElement,available=document.fullscreenEnabled&&!!document.documentElement.requestFullscreen;
   const button=$('fullscreen');
@@ -2566,9 +2575,8 @@ function updateFullscreenButton() {
   button.title=active?'恢复浏览器栏':available?'隐藏浏览器栏，让游戏占满屏幕':'查看当前浏览器的全屏限制';
 }
 async function exitGameFullscreen() {
-  autoFullscreenPending=false;
   if(!document.fullscreenElement)return;
-  try{await document.exitFullscreen();}catch{tell('暂时无法退出全屏，请使用浏览器的返回或退出全屏操作。');}
+  try{await document.exitFullscreen();}catch(error){tell('暂时无法退出全屏，请使用浏览器的返回或退出全屏操作。');}
 }
 async function enterGameFullscreen(manual=false) {
   if(fullscreenBusy||document.fullscreenElement||fullscreenDisplay.matches)return;
@@ -2576,37 +2584,25 @@ async function enterGameFullscreen(manual=false) {
     if(manual)tell('当前浏览器不支持或不允许网页全屏。可尝试用 Chrome 打开，或在浏览器菜单中添加到主屏幕后游玩。');
     return;
   }
-  fullscreenBusy=true;autoFullscreenPending=false;
+  fullscreenBusy=true;
   try{
     await document.documentElement.requestFullscreen({navigationUI:'hide'});
     if(portraitScreen.matches)await exitGameFullscreen();
-  }catch{
+  }catch(error){
     if(manual)tell('浏览器未允许进入全屏，请再次点击「全屏游玩」，或在浏览器菜单中添加到主屏幕后游玩。');
   }finally{fullscreenBusy=false;updateFullscreenButton();}
 }
-function tryAutoFullscreen() {
-  // 浏览器只允许在短暂的用户激活期内请求全屏，旋转屏幕本身不算激活。
-  if(autoFullscreenPending&&landscapeScreen.matches&&touchScreen.matches&&navigator.userActivation?.isActive&&!document.querySelector('dialog[open]'))enterGameFullscreen();
-}
+/* 不再自动进入全屏：进入全屏时浏览器（Chrome/各手机浏览器）都会弹出"如何退出全屏"的系统提示条，
+   网页无法控制它出现的时长；改为只在玩家点「全屏游玩」按钮时进入全屏，提示条就只在点按钮那一次短暂出现，游戏中不再反复弹出。 */
 $('fullscreen').onclick=()=>document.fullscreenElement?exitGameFullscreen():enterGameFullscreen(true);
-document.addEventListener('click',event=>{
-  if(event.isTrusted&&event.target.closest('main')&&!event.target.closest('input,select,textarea,a,dialog'))tryAutoFullscreen();
-});
-document.addEventListener('fullscreenchange',()=>{
-  const active=!!document.fullscreenElement;
-  if(hadFullscreen&&!active)autoFullscreenPending=false;
-  hadFullscreen=active;updateFullscreenButton();
-});
-landscapeScreen.addEventListener('change',()=>{
-  if(landscapeScreen.matches){autoFullscreenPending=true;tryAutoFullscreen();}
-  updateFullscreenButton();
-});
+document.addEventListener('fullscreenchange',updateFullscreenButton);
+landscapeScreen.addEventListener('change',updateFullscreenButton);
 portraitScreen.addEventListener('change',()=>{if(portraitScreen.matches)exitGameFullscreen();updateFullscreenButton();});
 fullscreenDisplay.addEventListener('change',updateFullscreenButton);
 updateFullscreenButton();
 $('difficulty').onchange=changeDifficulty;
 $('restart').onclick=restart;$('new-maze').onclick=newMaze;$('undo').onclick=undo;$('hint').onclick=showHint;
-$('continue').onclick=()=>{$('victory').close();if(state.mode==='endless')startEndless((BigInt(state.endlessStage)+1n).toString());else if(state.mode==='campaign'&&state.level<LEVELS.length)loadLevel(state.level+1,null,'campaign',`L${state.level+1}-`+state.seed.replace(/^L\d+-/,''));else newMaze();};
+$('continue').onclick=()=>{$('victory').close();if(state.mode==='endless')startEndless((BigInt(state.endlessStage)+BigInt(1)).toString());else if(state.mode==='campaign'&&state.level<LEVELS.length)loadLevel(state.level+1,null,'campaign',`L${state.level+1}-`+state.seed.replace(/^L\d+-/,''));else newMaze();};
 function showEnding() {stopReplay(false);$('victory').close();$('ending-stats').textContent=`15 / 15 关完成 · 累计 ${save.stats.totalSteps} 步 · ${save.stats.achievements.length} / 20 项成就`;$('ending').hidden=false;document.querySelector('.shell').inert=true;$('ending').focus();}
 function closeEnding() {$('ending').hidden=true;document.querySelector('.shell').inert=false;}
 $('ending-chapters').onclick=()=>{closeEnding();showLevels();};$('ending-route').onclick=()=>{closeEnding();startReplay();};
@@ -2625,7 +2621,7 @@ function loadRequestedLevel() {
   const code=new URLSearchParams(location.hash.slice(1)).get('map');
   if(code){try{loadLevel(1,decodeMap(code),'custom');}catch(error){loadLevel(save.current);tell('链接关卡无效：'+error.message);}return;}
   const request=seedRequest();
-  if(request?.endlessStage){startEndless(request.endlessStage,request.seed);return;}
+  if(request&&request.endlessStage){startEndless(request.endlessStage,request.seed);return;}
   if(request)loadLevel(request.level,null,dailyDate(request.seed)?'daily':request.level>save.unlocked?'shared':'campaign',request.seed);else loadLevel(save.current);
 }
 $('transfer-open').onclick=()=>{$('transfer-status').textContent='';$('transfer-dialog').showModal();};
@@ -2642,10 +2638,10 @@ $('endless').onclick=()=>{
 };
 window.addEventListener('hashchange',loadRequestedLevel);window.addEventListener('resize',()=>{if($('stats-dialog').open)drawStatistics();});
 let mapResizeFrame;
-new ResizeObserver(()=>{
-  cancelAnimationFrame(mapResizeFrame);
-  mapResizeFrame=requestAnimationFrame(()=>{if(state){render();centerPlayer();}});
-}).observe($('maze-stage'));
+function onStageResize(){cancelAnimationFrame(mapResizeFrame);mapResizeFrame=requestAnimationFrame(()=>{if(state){render();centerPlayer();}});}
+/* 旧内核没有 ResizeObserver，退回 window resize */
+if('ResizeObserver' in window)new ResizeObserver(onStageResize).observe($('maze-stage'));
+else window.addEventListener('resize',onStageResize);
 $('tutorial-done').onclick=finishTutorial;$('tutorial-skip').onclick=finishTutorial;
 /* 点击走：按坐标判定，不依赖命中哪个元素（画布被容器留白/滚动影响时，事件目标常常是容器本身） */
 document.addEventListener('click',event=>{
@@ -2673,7 +2669,7 @@ if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
 function labelControls(root=document) {
-  root.querySelectorAll('button,input,select,textarea,a[href],[tabindex]').forEach(el=>{if(!el.hasAttribute('aria-label')){const label=el.closest('label')?.textContent||el.textContent||el.getAttribute('placeholder')||el.id;el.setAttribute('aria-label',label.trim());}});
+  root.querySelectorAll('button,input,select,textarea,a[href],[tabindex]').forEach(el=>{if(!el.hasAttribute('aria-label')){const label=(el.closest('label')&&el.closest('label').textContent)||el.textContent||el.getAttribute('placeholder')||el.id;el.setAttribute('aria-label',label.trim());}});
 }
 $('settings-open').onclick=()=>{showKeySettings();$('settings-dialog').showModal();};
 $('key-mode').onchange=()=>{save.prefs.keyMode=$('key-mode').value;writeSave();applyPreferences();showKeySettings();};document.querySelectorAll('[data-bind]').forEach(input=>input.addEventListener('keydown',captureBinding));$('save-bindings').onclick=commitBindings;

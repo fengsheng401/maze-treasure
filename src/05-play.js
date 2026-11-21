@@ -16,7 +16,7 @@ function move(direction) {
   state.visited.add(state.pos);
   if(picked!==null){state.collected.add(picked);const unlockedIndex=state.map.keys.indexOf(picked);const openedDoors=(state.map.doors||[]).filter(d=>d.key===unlockedIndex);openedDoors.forEach(d=>{if(state.visible.has(d.pos))showEffect(d.pos,'collect-flash');});refreshKeyReach();sound('key');tell(`拿到 ${unlockedIndex+1} 号钥匙${openedDoors.length?`，${unlockedIndex+1} 号锁门已解锁！`:'。'}${state.collected.size===state.map.keys.length?'出口已开启。':''}`);}else if(state.pos!==from)tell('留意数字钥匙与同编号锁门，守卫每步巡逻一次。');
   collectItems();
-  const trap=state.map.traps?.find(t=>t.pos===state.pos&&(!t.hardOnly||state.difficulty==='hardcore'));
+  const trap=state.map.traps&&state.map.traps.find(t=>t.pos===state.pos&&(!t.hardOnly||state.difficulty==='hardcore'));
   if(trap){state.steps+=difficultyConfig().trap;state.trapHits++;bump(`踩中陷阱：额外扣 ${difficultyConfig().trap} 步预算。`);}
   snapshot.revealed=updateVision();state.history.push(snapshot);state.trace.push(traceStep());
   if(picked!==null)showEffect(picked,'collect-flash');
@@ -55,15 +55,15 @@ function togglePause() {
   tick();stopMovement();gesture=null;document.body.classList.add('paused');$('pause-dialog').showModal();$('phase').textContent='已暂停';pauseBgm();
 }
 function onKey(event) {
-  if(event.altKey||event.ctrlKey||event.metaKey||event.isComposing||event.target.closest?.('input,textarea,select,[contenteditable="true"]')||document.querySelector('dialog[open]'))return;
-  if([' ','Enter'].includes(event.key)&&event.target.closest?.('button,a'))return;
+  if(event.altKey||event.ctrlKey||event.metaKey||event.isComposing||event.target.closest&&event.target.closest('input,textarea,select,[contenteditable="true"]')||document.querySelector('dialog[open]'))return;
+  if([' ','Enter'].includes(event.key)&&event.target.closest&&event.target.closest('button,a'))return;
   const direction=directionFor(event.key);if(direction){event.preventDefault();stopAutoWalk();if(!event.repeat)beginMovement(direction,'key:'+normalizeKey(event.key));return;}
   if(event.key.toLowerCase()==='p'){event.preventDefault();togglePause();return;}
   if(event.key.toLowerCase()==='h'){event.preventDefault();showHint();return;}
   if(event.key==='Backspace'){event.preventDefault();undo();}
 }
 document.addEventListener('keydown',onKey);
-document.addEventListener('keyup',event=>{if(moveHold?.source==='key:'+normalizeKey(event.key))stopMovement();});
+document.addEventListener('keyup',event=>{if(moveHold&&moveHold.source==='key:'+normalizeKey(event.key))stopMovement();});
 window.addEventListener('blur',stopMovement);
 document.addEventListener('pointerdown',event=>{if(!event.target.closest('#maze-stage,.dpad'))stopMovement();});
 document.querySelectorAll('[data-direction]').forEach(button=>{
@@ -83,7 +83,7 @@ $('maze-stage').addEventListener('pointermove',event=>{
   const direction=Math.abs(dx)>Math.abs(dy)?dx>0?'right':'left':dy>0?'down':'up';
   if(direction!==gesture.direction){gesture.direction=direction;beginMovement(direction,'gesture:'+event.pointerId);}
 });
-for(const type of ['pointerup','pointercancel','lostpointercapture'])$('maze-stage').addEventListener(type,event=>{if(gesture?.id===event.pointerId){gesture=null;stopMovement();}});
+for(const type of ['pointerup','pointercancel','lostpointercapture'])$('maze-stage').addEventListener(type,event=>{if(gesture&&gesture.id===event.pointerId){gesture=null;stopMovement();}});
 $('maze-stage').addEventListener('contextmenu',event=>event.preventDefault());
 $('pause').onclick=togglePause;$('resume').onclick=togglePause;
 $('pause-dialog').addEventListener('close',()=>{lastTick=performance.now();document.body.classList.remove('paused');renderHUD();resumeBgm();$('maze').focus({preventScroll:true});});
@@ -104,7 +104,7 @@ updateMenu();narrowScreen.addEventListener('change',updateMenu);
 updateGameLayout();landscapeScreen.addEventListener('change',updateGameLayout);
 $('topbar').addEventListener('click',event=>{if(narrowScreen.matches&&event.target.closest('button'))$('game-menu').open=false;});
 const touchScreen=matchMedia('(any-pointer:coarse)'),portraitScreen=matchMedia('(orientation:portrait)'),fullscreenDisplay=matchMedia('(display-mode:fullscreen)');
-let autoFullscreenPending=true,fullscreenBusy=false,hadFullscreen=false;
+let fullscreenBusy=false;
 function updateFullscreenButton() {
   const active=!!document.fullscreenElement,available=document.fullscreenEnabled&&!!document.documentElement.requestFullscreen;
   const button=$('fullscreen');
@@ -115,9 +115,8 @@ function updateFullscreenButton() {
   button.title=active?'恢复浏览器栏':available?'隐藏浏览器栏，让游戏占满屏幕':'查看当前浏览器的全屏限制';
 }
 async function exitGameFullscreen() {
-  autoFullscreenPending=false;
   if(!document.fullscreenElement)return;
-  try{await document.exitFullscreen();}catch{tell('暂时无法退出全屏，请使用浏览器的返回或退出全屏操作。');}
+  try{await document.exitFullscreen();}catch(error){tell('暂时无法退出全屏，请使用浏览器的返回或退出全屏操作。');}
 }
 async function enterGameFullscreen(manual=false) {
   if(fullscreenBusy||document.fullscreenElement||fullscreenDisplay.matches)return;
@@ -125,37 +124,25 @@ async function enterGameFullscreen(manual=false) {
     if(manual)tell('当前浏览器不支持或不允许网页全屏。可尝试用 Chrome 打开，或在浏览器菜单中添加到主屏幕后游玩。');
     return;
   }
-  fullscreenBusy=true;autoFullscreenPending=false;
+  fullscreenBusy=true;
   try{
     await document.documentElement.requestFullscreen({navigationUI:'hide'});
     if(portraitScreen.matches)await exitGameFullscreen();
-  }catch{
+  }catch(error){
     if(manual)tell('浏览器未允许进入全屏，请再次点击「全屏游玩」，或在浏览器菜单中添加到主屏幕后游玩。');
   }finally{fullscreenBusy=false;updateFullscreenButton();}
 }
-function tryAutoFullscreen() {
-  // 浏览器只允许在短暂的用户激活期内请求全屏，旋转屏幕本身不算激活。
-  if(autoFullscreenPending&&landscapeScreen.matches&&touchScreen.matches&&navigator.userActivation?.isActive&&!document.querySelector('dialog[open]'))enterGameFullscreen();
-}
+/* 不再自动进入全屏：进入全屏时浏览器（Chrome/各手机浏览器）都会弹出"如何退出全屏"的系统提示条，
+   网页无法控制它出现的时长；改为只在玩家点「全屏游玩」按钮时进入全屏，提示条就只在点按钮那一次短暂出现，游戏中不再反复弹出。 */
 $('fullscreen').onclick=()=>document.fullscreenElement?exitGameFullscreen():enterGameFullscreen(true);
-document.addEventListener('click',event=>{
-  if(event.isTrusted&&event.target.closest('main')&&!event.target.closest('input,select,textarea,a,dialog'))tryAutoFullscreen();
-});
-document.addEventListener('fullscreenchange',()=>{
-  const active=!!document.fullscreenElement;
-  if(hadFullscreen&&!active)autoFullscreenPending=false;
-  hadFullscreen=active;updateFullscreenButton();
-});
-landscapeScreen.addEventListener('change',()=>{
-  if(landscapeScreen.matches){autoFullscreenPending=true;tryAutoFullscreen();}
-  updateFullscreenButton();
-});
+document.addEventListener('fullscreenchange',updateFullscreenButton);
+landscapeScreen.addEventListener('change',updateFullscreenButton);
 portraitScreen.addEventListener('change',()=>{if(portraitScreen.matches)exitGameFullscreen();updateFullscreenButton();});
 fullscreenDisplay.addEventListener('change',updateFullscreenButton);
 updateFullscreenButton();
 $('difficulty').onchange=changeDifficulty;
 $('restart').onclick=restart;$('new-maze').onclick=newMaze;$('undo').onclick=undo;$('hint').onclick=showHint;
-$('continue').onclick=()=>{$('victory').close();if(state.mode==='endless')startEndless((BigInt(state.endlessStage)+1n).toString());else if(state.mode==='campaign'&&state.level<LEVELS.length)loadLevel(state.level+1,null,'campaign',`L${state.level+1}-`+state.seed.replace(/^L\d+-/,''));else newMaze();};
+$('continue').onclick=()=>{$('victory').close();if(state.mode==='endless')startEndless((BigInt(state.endlessStage)+BigInt(1)).toString());else if(state.mode==='campaign'&&state.level<LEVELS.length)loadLevel(state.level+1,null,'campaign',`L${state.level+1}-`+state.seed.replace(/^L\d+-/,''));else newMaze();};
 function showEnding() {stopReplay(false);$('victory').close();$('ending-stats').textContent=`15 / 15 关完成 · 累计 ${save.stats.totalSteps} 步 · ${save.stats.achievements.length} / 20 项成就`;$('ending').hidden=false;document.querySelector('.shell').inert=true;$('ending').focus();}
 function closeEnding() {$('ending').hidden=true;document.querySelector('.shell').inert=false;}
 $('ending-chapters').onclick=()=>{closeEnding();showLevels();};$('ending-route').onclick=()=>{closeEnding();startReplay();};
@@ -174,7 +161,7 @@ function loadRequestedLevel() {
   const code=new URLSearchParams(location.hash.slice(1)).get('map');
   if(code){try{loadLevel(1,decodeMap(code),'custom');}catch(error){loadLevel(save.current);tell('链接关卡无效：'+error.message);}return;}
   const request=seedRequest();
-  if(request?.endlessStage){startEndless(request.endlessStage,request.seed);return;}
+  if(request&&request.endlessStage){startEndless(request.endlessStage,request.seed);return;}
   if(request)loadLevel(request.level,null,dailyDate(request.seed)?'daily':request.level>save.unlocked?'shared':'campaign',request.seed);else loadLevel(save.current);
 }
 $('transfer-open').onclick=()=>{$('transfer-status').textContent='';$('transfer-dialog').showModal();};
@@ -191,10 +178,10 @@ $('endless').onclick=()=>{
 };
 window.addEventListener('hashchange',loadRequestedLevel);window.addEventListener('resize',()=>{if($('stats-dialog').open)drawStatistics();});
 let mapResizeFrame;
-new ResizeObserver(()=>{
-  cancelAnimationFrame(mapResizeFrame);
-  mapResizeFrame=requestAnimationFrame(()=>{if(state){render();centerPlayer();}});
-}).observe($('maze-stage'));
+function onStageResize(){cancelAnimationFrame(mapResizeFrame);mapResizeFrame=requestAnimationFrame(()=>{if(state){render();centerPlayer();}});}
+/* 旧内核没有 ResizeObserver，退回 window resize */
+if('ResizeObserver' in window)new ResizeObserver(onStageResize).observe($('maze-stage'));
+else window.addEventListener('resize',onStageResize);
 $('tutorial-done').onclick=finishTutorial;$('tutorial-skip').onclick=finishTutorial;
 /* 点击走：按坐标判定，不依赖命中哪个元素（画布被容器留白/滚动影响时，事件目标常常是容器本身） */
 document.addEventListener('click',event=>{
@@ -222,7 +209,7 @@ if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
 function labelControls(root=document) {
-  root.querySelectorAll('button,input,select,textarea,a[href],[tabindex]').forEach(el=>{if(!el.hasAttribute('aria-label')){const label=el.closest('label')?.textContent||el.textContent||el.getAttribute('placeholder')||el.id;el.setAttribute('aria-label',label.trim());}});
+  root.querySelectorAll('button,input,select,textarea,a[href],[tabindex]').forEach(el=>{if(!el.hasAttribute('aria-label')){const label=(el.closest('label')&&el.closest('label').textContent)||el.textContent||el.getAttribute('placeholder')||el.id;el.setAttribute('aria-label',label.trim());}});
 }
 $('settings-open').onclick=()=>{showKeySettings();$('settings-dialog').showModal();};
 $('key-mode').onchange=()=>{save.prefs.keyMode=$('key-mode').value;writeSave();applyPreferences();showKeySettings();};document.querySelectorAll('[data-bind]').forEach(input=>input.addEventListener('keydown',captureBinding));$('save-bindings').onclick=commitBindings;

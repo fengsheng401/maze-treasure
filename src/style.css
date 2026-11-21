@@ -1,3 +1,8 @@
+  /* ===== [00] 兼容性 ===== */
+  /* 关掉安卓各内核（Chrome/百度/X5 等）点按时的半透明蓝色高亮，以及 iOS 长按弹菜单 */
+  *,*::before,*::after{-webkit-tap-highlight-color:rgba(0,0,0,0);}
+  html{-webkit-touch-callout:none;}
+
   /* ===== [01] 主题变量 ===== */
   :root {
     --bg: #2e2017;
@@ -853,6 +858,7 @@
 
     .maze-stage {
       flex: none;
+      height: 460px;
       height: clamp(240px, 46dvh, 460px);
       padding: 12px;
     }
