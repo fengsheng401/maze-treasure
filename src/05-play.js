@@ -103,6 +103,56 @@ function updateGameLayout() {
 updateMenu();narrowScreen.addEventListener('change',updateMenu);
 updateGameLayout();landscapeScreen.addEventListener('change',updateGameLayout);
 $('topbar').addEventListener('click',event=>{if(narrowScreen.matches&&event.target.closest('button'))$('game-menu').open=false;});
+const touchScreen=matchMedia('(any-pointer:coarse)'),portraitScreen=matchMedia('(orientation:portrait)'),fullscreenDisplay=matchMedia('(display-mode:fullscreen)');
+let autoFullscreenPending=true,fullscreenBusy=false,hadFullscreen=false;
+function updateFullscreenButton() {
+  const active=!!document.fullscreenElement,available=document.fullscreenEnabled&&!!document.documentElement.requestFullscreen;
+  const button=$('fullscreen');
+  button.hidden=!active&&(!landscapeScreen.matches||!touchScreen.matches||fullscreenDisplay.matches);
+  button.textContent=active?'退出全屏':available?'全屏游玩':'全屏说明';
+  button.setAttribute('aria-label',button.textContent);
+  button.setAttribute('aria-pressed',String(active));
+  button.title=active?'恢复浏览器栏':available?'隐藏浏览器栏，让游戏占满屏幕':'查看当前浏览器的全屏限制';
+}
+async function exitGameFullscreen() {
+  autoFullscreenPending=false;
+  if(!document.fullscreenElement)return;
+  try{await document.exitFullscreen();}catch{tell('暂时无法退出全屏，请使用浏览器的返回或退出全屏操作。');}
+}
+async function enterGameFullscreen(manual=false) {
+  if(fullscreenBusy||document.fullscreenElement||fullscreenDisplay.matches)return;
+  if(!document.fullscreenEnabled||!document.documentElement.requestFullscreen){
+    if(manual)tell('当前浏览器不支持或不允许网页全屏。可尝试用 Chrome 打开，或在浏览器菜单中添加到主屏幕后游玩。');
+    return;
+  }
+  fullscreenBusy=true;autoFullscreenPending=false;
+  try{
+    await document.documentElement.requestFullscreen({navigationUI:'hide'});
+    if(portraitScreen.matches)await exitGameFullscreen();
+  }catch{
+    if(manual)tell('浏览器未允许进入全屏，请再次点击「全屏游玩」，或在浏览器菜单中添加到主屏幕后游玩。');
+  }finally{fullscreenBusy=false;updateFullscreenButton();}
+}
+function tryAutoFullscreen() {
+  // 浏览器只允许在短暂的用户激活期内请求全屏，旋转屏幕本身不算激活。
+  if(autoFullscreenPending&&landscapeScreen.matches&&touchScreen.matches&&navigator.userActivation?.isActive&&!document.querySelector('dialog[open]'))enterGameFullscreen();
+}
+$('fullscreen').onclick=()=>document.fullscreenElement?exitGameFullscreen():enterGameFullscreen(true);
+document.addEventListener('click',event=>{
+  if(event.isTrusted&&event.target.closest('main')&&!event.target.closest('input,select,textarea,a,dialog'))tryAutoFullscreen();
+});
+document.addEventListener('fullscreenchange',()=>{
+  const active=!!document.fullscreenElement;
+  if(hadFullscreen&&!active)autoFullscreenPending=false;
+  hadFullscreen=active;updateFullscreenButton();
+});
+landscapeScreen.addEventListener('change',()=>{
+  if(landscapeScreen.matches){autoFullscreenPending=true;tryAutoFullscreen();}
+  updateFullscreenButton();
+});
+portraitScreen.addEventListener('change',()=>{if(portraitScreen.matches)exitGameFullscreen();updateFullscreenButton();});
+fullscreenDisplay.addEventListener('change',updateFullscreenButton);
+updateFullscreenButton();
 $('difficulty').onchange=changeDifficulty;
 $('restart').onclick=restart;$('new-maze').onclick=newMaze;$('undo').onclick=undo;$('hint').onclick=showHint;
 $('continue').onclick=()=>{$('victory').close();if(state.mode==='endless')startEndless((BigInt(state.endlessStage)+1n).toString());else if(state.mode==='campaign'&&state.level<LEVELS.length)loadLevel(state.level+1,null,'campaign',`L${state.level+1}-`+state.seed.replace(/^L\d+-/,''));else newMaze();};
@@ -164,8 +214,8 @@ document.addEventListener('click',event=>{
 },true);
 $('side-minus').onclick=()=>{save.prefs.sideFs=Math.max(10,(save.prefs.sideFs||12)-1);writeSave();applySideFs();};
 $('side-plus').onclick=()=>{save.prefs.sideFs=Math.min(17,(save.prefs.sideFs||12)+1);writeSave();applySideFs();};
-$('music').onclick=()=>{const next=save.prefs.music===false;save.prefs.music=next;writeSave();applyPreferences();if(next)startBgm();else stopBgm();};
-$('install').textContent='离线游玩';$('install').onclick=()=>tell('保存这一个 HTML 文件即可离线双击游玩，无需安装、联网或其他资源。');
+$('music').onclick=()=>setMusicEnabled(isSoundMuted()||save.prefs.music===false);
+$('install').textContent='离线游玩';$('install').onclick=()=>tell('手机可在浏览器菜单中添加到主屏幕，支持的浏览器会以全屏启动；也可保存这一个 HTML 文件离线双击游玩。');
 /* PWA 接线：file:// 下浏览器不允许注册 SW，所以只在 http(s) 环境接；双击打开时完全跳过，不产生控制台报错。 */
 if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){
   const manifestLink=document.createElement('link');manifestLink.rel='manifest';manifestLink.href='manifest.webmanifest';document.head.append(manifestLink);

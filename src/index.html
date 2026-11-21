@@ -13,6 +13,8 @@
   <div class="shell">
     <header>
       <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4.2"/><path d="M11.2 11.2 20 20"/><path d="M16.4 16.4 19 13.8"/><path d="M13.6 13.6 16.2 11"/></svg></span>微型冒险</div>
+      <button class="button secondary" id="mute" type="button" title="同时控制背景音乐和游戏音效">声音：关</button>
+      <button class="button" id="fullscreen" type="button" aria-pressed="false" hidden>全屏游玩</button>
       <details class="mobile-menu" id="game-menu" open>
       <summary class="button secondary">菜单</summary>
       <nav class="topbar" id="topbar" aria-label="游戏菜单">
@@ -33,7 +35,6 @@
           <option value="indigo">靛</option>
           <option value="violet">紫</option>
         </select></label>
-        <button class="button secondary" id="mute" title="点击页面后启用合成音效">声音：开</button>
         <button class="button secondary" id="music" title="背景音乐开关">音乐：开</button>
         <button class="button secondary" id="level-select">选关</button>
         <button class="button secondary" id="daily">今日挑战</button>

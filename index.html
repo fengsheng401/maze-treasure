@@ -1141,6 +1141,8 @@
   .dawn-door::after { content: ''; position: absolute; left: -50px; right: -50px; top: 100%; height: 75px; background: linear-gradient(#e1c27a66,transparent); clip-path: polygon(27% 0,73% 0,100% 100%,0 100%); }
   @media(max-width:760px) { #level-list { grid-template-columns: 1fr; } .chapter > p:not(.eyebrow) { min-height: 0; } #achievement-list { grid-template-columns: 1fr; } }
   .mobile-menu > summary { display: none; }
+  #mute { flex: none; min-height: 44px; white-space: nowrap; }
+  #fullscreen { flex: none; min-height: 44px; border-color: var(--gold); color: var(--gold); white-space: nowrap; }
   .board-top { align-items: center; }
   .board-top #pause { padding: 6px 13px; margin-left: auto; }
   #maze-stage { touch-action: none; overscroll-behavior: contain; }
@@ -1207,9 +1209,9 @@
     footer { padding-bottom: max(20px,env(safe-area-inset-bottom)); }
   }
   @media (max-width:1100px) and (max-height:600px) and (orientation:landscape) {
-    .shell { width: 100%; max-width: none; height: 100dvh; padding: max(4px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left)); display: grid; grid-template-rows: auto auto minmax(0,1fr); gap: 6px; }
+    .shell { width: 100%; max-width: none; height: 100dvh; padding: env(safe-area-inset-top) max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left)); display: grid; grid-template-rows: auto auto minmax(0,1fr); gap: 6px; }
     header { min-height: 44px; padding: 0; gap: 8px; }
-    .brand { font-size: 12px; gap: 6px; }
+    .brand { font-size: 12px; gap: 6px; margin-right: auto; }
     .mobile-menu > nav { top: calc(100% + 6px); max-height: calc(100dvh - 70px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
     .intro { padding: 0; gap: 8px; flex-wrap: nowrap; }
     .intro .eyebrow, .subtitle { display: none; }
@@ -1255,6 +1257,8 @@
   <div class="shell">
     <header>
       <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4.2"/><path d="M11.2 11.2 20 20"/><path d="M16.4 16.4 19 13.8"/><path d="M13.6 13.6 16.2 11"/></svg></span>微型冒险</div>
+      <button class="button secondary" id="mute" type="button" title="同时控制背景音乐和游戏音效">声音：关</button>
+      <button class="button" id="fullscreen" type="button" aria-pressed="false" hidden>全屏游玩</button>
       <details class="mobile-menu" id="game-menu" open>
       <summary class="button secondary">菜单</summary>
       <nav class="topbar" id="topbar" aria-label="游戏菜单">
@@ -1275,7 +1279,6 @@
           <option value="indigo">靛</option>
           <option value="violet">紫</option>
         </select></label>
-        <button class="button secondary" id="mute" title="点击页面后启用合成音效">声音：开</button>
         <button class="button secondary" id="music" title="背景音乐开关">音乐：开</button>
         <button class="button secondary" id="level-select">选关</button>
         <button class="button secondary" id="daily">今日挑战</button>
@@ -1778,16 +1781,17 @@ function showHint() {
   }
   tell(`已标出到 ${state.map.keys.indexOf(target)+1} 号钥匙的最短路线（${paths.distances[target]} 步）。${note}1.5 秒后消失。已用 ${state.hints} 次提示。`);render();hintTimer=setTimeout(()=>clearHint(true),1500);
 }
-let audioContext=null;
+let audioContext=null,soundOptIn=!matchMedia('(any-pointer:coarse)').matches;
+function isSoundMuted() {return !soundOptIn||save.prefs.muted;}
 function initAudio() {
-  if(save.prefs.muted)return;
+  if(isSoundMuted())return;
   const Audio=window.AudioContext||window.webkitAudioContext;
-  if(!Audio){$('mute').textContent='声音不受支持';return;}
+  if(!Audio)return;
   if(!audioContext)audioContext=new Audio();
   if(audioContext.state==='suspended')audioContext.resume().catch(()=>{});
 }
 function sound(kind) {
-  if(save.prefs.muted||!audioContext||audioContext.state!=='running')return;
+  if(isSoundMuted()||!audioContext||audioContext.state!=='running')return;
   const notes={step:[[180,0,.022]],key:[[660,0,.08],[990,.09,.13]],locked:[[100,0,.16]],win:[[523,0,.12],[659,.12,.12],[784,.24,.2]]}[kind];
   for(const [frequency,offset,duration] of notes) {const oscillator=audioContext.createOscillator(),gain=audioContext.createGain(),at=audioContext.currentTime+offset;oscillator.type=kind==='step'?'square':'sine';oscillator.frequency.value=frequency;gain.gain.setValueAtTime(.0001,at);gain.gain.exponentialRampToValueAtTime(kind==='step'?.025:.10,at+.006);gain.gain.exponentialRampToValueAtTime(.0001,at+duration);oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start(at);oscillator.stop(at+duration+.01);}
 }
@@ -1797,19 +1801,32 @@ function applySideFs(){
 }
 function applyPreferences() {
   applySideFs();
-  $('mute').textContent=save.prefs.muted?'声音：关':'声音：开';$('mute').setAttribute('aria-pressed',String(save.prefs.muted));
-  $('music').textContent=save.prefs.music===false?'音乐：关':'音乐：开';$('music').setAttribute('aria-pressed',String(save.prefs.music!==false));
+  const muted=isSoundMuted(),musicOn=!muted&&save.prefs.music!==false;
+  $('mute').textContent=muted?'声音：关':'声音：开';$('mute').setAttribute('aria-pressed',String(!muted));
+  $('music').textContent=musicOn?'音乐：开':'音乐：关';$('music').setAttribute('aria-pressed',String(musicOn));
+  $('music').setAttribute('aria-label',musicOn?'关闭背景音乐':'开启背景音乐');
   document.documentElement.dataset.skin=save.prefs.skin;$('skin').value=save.prefs.skin;
   document.documentElement.dataset.avatarSkin=save.prefs.avatarSkin;$('avatar-skin').value=save.prefs.avatarSkin;
-  document.documentElement.dataset.contrast=String(save.prefs.contrast);document.documentElement.dataset.large=String(save.prefs.large);$('high-contrast').checked=save.prefs.contrast;$('large-text').checked=save.prefs.large;$('music-toggle').checked=save.prefs.music!==false;
-  $('mute').setAttribute('aria-label',save.prefs.muted?'打开声音':'关闭声音');
+  document.documentElement.dataset.contrast=String(save.prefs.contrast);document.documentElement.dataset.large=String(save.prefs.large);$('high-contrast').checked=save.prefs.contrast;$('large-text').checked=save.prefs.large;$('music-toggle').checked=musicOn;
+  $('mute').setAttribute('aria-label',muted?'开启音乐和音效':'关闭所有声音');
   $('key-mode').value=save.prefs.keyMode;$('custom-bindings').hidden=save.prefs.keyMode!=='custom';
   const names={both:'方向键 / WASD',arrows:'方向键 ↑ ↓ ← →',wasd:'W A S D',custom:'自定义 '+Object.entries(save.prefs.bindings).map(([dir,key])=>({up:'上',down:'下',left:'左',right:'右'}[dir])+': '+(key===' '?'Space':key)).join(' / ')};
   $('key-help').innerHTML=`${names[save.prefs.keyMode]} 移动，按住连走。<br><strong>点一下看得见的格子，会自动走过去</strong>（按方向键即停）。<br>集齐全部钥匙后走入 <strong>E</strong> 通关。`;
   $('hint').textContent=directionFor('h')?'提示（按钮）':'提示 H';
   if(state){render();centerPlayer();}if($('editor-dialog').open)renderEditor();if($('stats-dialog').open)drawStatistics();
 }
-function toggleMute() {save.prefs.muted=!save.prefs.muted;writeSave();applyPreferences();if(save.prefs.muted)audioContext?.suspend().catch(()=>{});else initAudio();}
+function toggleMute() {
+  const enabled=isSoundMuted();soundOptIn=true;save.prefs.muted=!enabled;
+  if(enabled)save.prefs.music=true;
+  writeSave();applyPreferences();
+  if(enabled){initAudio();startBgm();}else{stopBgm();audioContext?.suspend().catch(()=>{});}
+}
+function setMusicEnabled(enabled) {
+  save.prefs.music=enabled;
+  if(enabled){soundOptIn=true;save.prefs.muted=false;}
+  writeSave();applyPreferences();
+  if(enabled){initAudio();startBgm();}else stopBgm();
+}
 /* ===== [J2] 每日挑战 ===== */
 /* 返回本地日期（本地时间 0 点换日），不再用 UTC */
 function todayUTC() {const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
@@ -2537,6 +2554,56 @@ function updateGameLayout() {
 updateMenu();narrowScreen.addEventListener('change',updateMenu);
 updateGameLayout();landscapeScreen.addEventListener('change',updateGameLayout);
 $('topbar').addEventListener('click',event=>{if(narrowScreen.matches&&event.target.closest('button'))$('game-menu').open=false;});
+const touchScreen=matchMedia('(any-pointer:coarse)'),portraitScreen=matchMedia('(orientation:portrait)'),fullscreenDisplay=matchMedia('(display-mode:fullscreen)');
+let autoFullscreenPending=true,fullscreenBusy=false,hadFullscreen=false;
+function updateFullscreenButton() {
+  const active=!!document.fullscreenElement,available=document.fullscreenEnabled&&!!document.documentElement.requestFullscreen;
+  const button=$('fullscreen');
+  button.hidden=!active&&(!landscapeScreen.matches||!touchScreen.matches||fullscreenDisplay.matches);
+  button.textContent=active?'退出全屏':available?'全屏游玩':'全屏说明';
+  button.setAttribute('aria-label',button.textContent);
+  button.setAttribute('aria-pressed',String(active));
+  button.title=active?'恢复浏览器栏':available?'隐藏浏览器栏，让游戏占满屏幕':'查看当前浏览器的全屏限制';
+}
+async function exitGameFullscreen() {
+  autoFullscreenPending=false;
+  if(!document.fullscreenElement)return;
+  try{await document.exitFullscreen();}catch{tell('暂时无法退出全屏，请使用浏览器的返回或退出全屏操作。');}
+}
+async function enterGameFullscreen(manual=false) {
+  if(fullscreenBusy||document.fullscreenElement||fullscreenDisplay.matches)return;
+  if(!document.fullscreenEnabled||!document.documentElement.requestFullscreen){
+    if(manual)tell('当前浏览器不支持或不允许网页全屏。可尝试用 Chrome 打开，或在浏览器菜单中添加到主屏幕后游玩。');
+    return;
+  }
+  fullscreenBusy=true;autoFullscreenPending=false;
+  try{
+    await document.documentElement.requestFullscreen({navigationUI:'hide'});
+    if(portraitScreen.matches)await exitGameFullscreen();
+  }catch{
+    if(manual)tell('浏览器未允许进入全屏，请再次点击「全屏游玩」，或在浏览器菜单中添加到主屏幕后游玩。');
+  }finally{fullscreenBusy=false;updateFullscreenButton();}
+}
+function tryAutoFullscreen() {
+  // 浏览器只允许在短暂的用户激活期内请求全屏，旋转屏幕本身不算激活。
+  if(autoFullscreenPending&&landscapeScreen.matches&&touchScreen.matches&&navigator.userActivation?.isActive&&!document.querySelector('dialog[open]'))enterGameFullscreen();
+}
+$('fullscreen').onclick=()=>document.fullscreenElement?exitGameFullscreen():enterGameFullscreen(true);
+document.addEventListener('click',event=>{
+  if(event.isTrusted&&event.target.closest('main')&&!event.target.closest('input,select,textarea,a,dialog'))tryAutoFullscreen();
+});
+document.addEventListener('fullscreenchange',()=>{
+  const active=!!document.fullscreenElement;
+  if(hadFullscreen&&!active)autoFullscreenPending=false;
+  hadFullscreen=active;updateFullscreenButton();
+});
+landscapeScreen.addEventListener('change',()=>{
+  if(landscapeScreen.matches){autoFullscreenPending=true;tryAutoFullscreen();}
+  updateFullscreenButton();
+});
+portraitScreen.addEventListener('change',()=>{if(portraitScreen.matches)exitGameFullscreen();updateFullscreenButton();});
+fullscreenDisplay.addEventListener('change',updateFullscreenButton);
+updateFullscreenButton();
 $('difficulty').onchange=changeDifficulty;
 $('restart').onclick=restart;$('new-maze').onclick=newMaze;$('undo').onclick=undo;$('hint').onclick=showHint;
 $('continue').onclick=()=>{$('victory').close();if(state.mode==='endless')startEndless((BigInt(state.endlessStage)+1n).toString());else if(state.mode==='campaign'&&state.level<LEVELS.length)loadLevel(state.level+1,null,'campaign',`L${state.level+1}-`+state.seed.replace(/^L\d+-/,''));else newMaze();};
@@ -2598,8 +2665,8 @@ document.addEventListener('click',event=>{
 },true);
 $('side-minus').onclick=()=>{save.prefs.sideFs=Math.max(10,(save.prefs.sideFs||12)-1);writeSave();applySideFs();};
 $('side-plus').onclick=()=>{save.prefs.sideFs=Math.min(17,(save.prefs.sideFs||12)+1);writeSave();applySideFs();};
-$('music').onclick=()=>{const next=save.prefs.music===false;save.prefs.music=next;writeSave();applyPreferences();if(next)startBgm();else stopBgm();};
-$('install').textContent='离线游玩';$('install').onclick=()=>tell('保存这一个 HTML 文件即可离线双击游玩，无需安装、联网或其他资源。');
+$('music').onclick=()=>setMusicEnabled(isSoundMuted()||save.prefs.music===false);
+$('install').textContent='离线游玩';$('install').onclick=()=>tell('手机可在浏览器菜单中添加到主屏幕，支持的浏览器会以全屏启动；也可保存这一个 HTML 文件离线双击游玩。');
 /* PWA 接线：file:// 下浏览器不允许注册 SW，所以只在 http(s) 环境接；双击打开时完全跳过，不产生控制台报错。 */
 if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){
   const manifestLink=document.createElement('link');manifestLink.rel='manifest';manifestLink.href='manifest.webmanifest';document.head.append(manifestLink);
@@ -2641,7 +2708,7 @@ function prepareBgm(){
 }
 let bgmWarned=false;
 function startBgm(){
-  if(save.prefs.muted||save.prefs.music===false)return;
+  if(isSoundMuted()||save.prefs.music===false)return;
   if(bgmEl&&!bgmEl.paused)return;
   const url=bgmUrl||prepareBgm();
   if(!url){if(!bgmWarned){bgmWarned=true;tell('背景音乐数据未能读取，请刷新页面重试。');}return;}
@@ -2650,7 +2717,8 @@ function startBgm(){
   bgmEl.volume=BGM_VOLUME;
   const started=bgmEl.play();
   if(started&&started.catch)started.catch(function(error){
-    if(!bgmWarned){bgmWarned=true;tell('背景音乐未能自动播放（'+error.name+'）。点一下画面任意处即可，或在顶栏点“音乐：开”重试。');}
+    if(isSoundMuted()||save.prefs.music===false)return;
+    if(!bgmWarned){bgmWarned=true;tell('背景音乐未能播放（'+error.name+'）。请关闭后再打开顶部声音开关重试。');}
   });
 }
 function stopBgm(){
@@ -2661,7 +2729,7 @@ function stopBgm(){
 function pauseBgm(){bgmDucked=true;if(bgmEl)bgmEl.volume=BGM_VOLUME*0.22;}
 function resumeBgm(){bgmDucked=false;if(bgmEl)bgmEl.volume=BGM_VOLUME;}
 function primeAudio(){
-  if(save.prefs.muted)return;
+  if(isSoundMuted())return;
   initAudio();
   startBgm();
 }
@@ -2669,14 +2737,11 @@ document.addEventListener('pointerdown',primeAudio,true);
 document.addEventListener('keydown',primeAudio,true);
 (function(){
   const box=document.getElementById('music-toggle');
-  if(box)box.addEventListener('change',()=>{
-    save.prefs.music=box.checked;writeSave();
-    if(box.checked)startBgm();else stopBgm();
-  });
+  if(box)box.addEventListener('change',()=>setMusicEnabled(box.checked));
 })();
 /* 只在浏览器空闲时准备音频，绝不占用按键处理 */
 function schedulePrepare(){
-  if(!save.prefs.muted){try{initAudio();}catch(error){}}
+  if(!isSoundMuted()){try{initAudio();}catch(error){}}
   if(window.requestIdleCallback)requestIdleCallback(function(){prepareBgm();},{timeout:2500});
   else setTimeout(prepareBgm,900);
 }

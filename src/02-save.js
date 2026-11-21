@@ -132,16 +132,17 @@ function showHint() {
   }
   tell(`已标出到 ${state.map.keys.indexOf(target)+1} 号钥匙的最短路线（${paths.distances[target]} 步）。${note}1.5 秒后消失。已用 ${state.hints} 次提示。`);render();hintTimer=setTimeout(()=>clearHint(true),1500);
 }
-let audioContext=null;
+let audioContext=null,soundOptIn=!matchMedia('(any-pointer:coarse)').matches;
+function isSoundMuted() {return !soundOptIn||save.prefs.muted;}
 function initAudio() {
-  if(save.prefs.muted)return;
+  if(isSoundMuted())return;
   const Audio=window.AudioContext||window.webkitAudioContext;
-  if(!Audio){$('mute').textContent='声音不受支持';return;}
+  if(!Audio)return;
   if(!audioContext)audioContext=new Audio();
   if(audioContext.state==='suspended')audioContext.resume().catch(()=>{});
 }
 function sound(kind) {
-  if(save.prefs.muted||!audioContext||audioContext.state!=='running')return;
+  if(isSoundMuted()||!audioContext||audioContext.state!=='running')return;
   const notes={step:[[180,0,.022]],key:[[660,0,.08],[990,.09,.13]],locked:[[100,0,.16]],win:[[523,0,.12],[659,.12,.12],[784,.24,.2]]}[kind];
   for(const [frequency,offset,duration] of notes) {const oscillator=audioContext.createOscillator(),gain=audioContext.createGain(),at=audioContext.currentTime+offset;oscillator.type=kind==='step'?'square':'sine';oscillator.frequency.value=frequency;gain.gain.setValueAtTime(.0001,at);gain.gain.exponentialRampToValueAtTime(kind==='step'?.025:.10,at+.006);gain.gain.exponentialRampToValueAtTime(.0001,at+duration);oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start(at);oscillator.stop(at+duration+.01);}
 }
@@ -151,19 +152,32 @@ function applySideFs(){
 }
 function applyPreferences() {
   applySideFs();
-  $('mute').textContent=save.prefs.muted?'声音：关':'声音：开';$('mute').setAttribute('aria-pressed',String(save.prefs.muted));
-  $('music').textContent=save.prefs.music===false?'音乐：关':'音乐：开';$('music').setAttribute('aria-pressed',String(save.prefs.music!==false));
+  const muted=isSoundMuted(),musicOn=!muted&&save.prefs.music!==false;
+  $('mute').textContent=muted?'声音：关':'声音：开';$('mute').setAttribute('aria-pressed',String(!muted));
+  $('music').textContent=musicOn?'音乐：开':'音乐：关';$('music').setAttribute('aria-pressed',String(musicOn));
+  $('music').setAttribute('aria-label',musicOn?'关闭背景音乐':'开启背景音乐');
   document.documentElement.dataset.skin=save.prefs.skin;$('skin').value=save.prefs.skin;
   document.documentElement.dataset.avatarSkin=save.prefs.avatarSkin;$('avatar-skin').value=save.prefs.avatarSkin;
-  document.documentElement.dataset.contrast=String(save.prefs.contrast);document.documentElement.dataset.large=String(save.prefs.large);$('high-contrast').checked=save.prefs.contrast;$('large-text').checked=save.prefs.large;$('music-toggle').checked=save.prefs.music!==false;
-  $('mute').setAttribute('aria-label',save.prefs.muted?'打开声音':'关闭声音');
+  document.documentElement.dataset.contrast=String(save.prefs.contrast);document.documentElement.dataset.large=String(save.prefs.large);$('high-contrast').checked=save.prefs.contrast;$('large-text').checked=save.prefs.large;$('music-toggle').checked=musicOn;
+  $('mute').setAttribute('aria-label',muted?'开启音乐和音效':'关闭所有声音');
   $('key-mode').value=save.prefs.keyMode;$('custom-bindings').hidden=save.prefs.keyMode!=='custom';
   const names={both:'方向键 / WASD',arrows:'方向键 ↑ ↓ ← →',wasd:'W A S D',custom:'自定义 '+Object.entries(save.prefs.bindings).map(([dir,key])=>({up:'上',down:'下',left:'左',right:'右'}[dir])+': '+(key===' '?'Space':key)).join(' / ')};
   $('key-help').innerHTML=`${names[save.prefs.keyMode]} 移动，按住连走。<br><strong>点一下看得见的格子，会自动走过去</strong>（按方向键即停）。<br>集齐全部钥匙后走入 <strong>E</strong> 通关。`;
   $('hint').textContent=directionFor('h')?'提示（按钮）':'提示 H';
   if(state){render();centerPlayer();}if($('editor-dialog').open)renderEditor();if($('stats-dialog').open)drawStatistics();
 }
-function toggleMute() {save.prefs.muted=!save.prefs.muted;writeSave();applyPreferences();if(save.prefs.muted)audioContext?.suspend().catch(()=>{});else initAudio();}
+function toggleMute() {
+  const enabled=isSoundMuted();soundOptIn=true;save.prefs.muted=!enabled;
+  if(enabled)save.prefs.music=true;
+  writeSave();applyPreferences();
+  if(enabled){initAudio();startBgm();}else{stopBgm();audioContext?.suspend().catch(()=>{});}
+}
+function setMusicEnabled(enabled) {
+  save.prefs.music=enabled;
+  if(enabled){soundOptIn=true;save.prefs.muted=false;}
+  writeSave();applyPreferences();
+  if(enabled){initAudio();startBgm();}else stopBgm();
+}
 /* ===== [J2] 每日挑战 ===== */
 /* 返回本地日期（本地时间 0 点换日），不再用 UTC */
 function todayUTC() {const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}

@@ -18,7 +18,7 @@ function prepareBgm(){
 }
 let bgmWarned=false;
 function startBgm(){
-  if(save.prefs.muted||save.prefs.music===false)return;
+  if(isSoundMuted()||save.prefs.music===false)return;
   if(bgmEl&&!bgmEl.paused)return;
   const url=bgmUrl||prepareBgm();
   if(!url){if(!bgmWarned){bgmWarned=true;tell('背景音乐数据未能读取，请刷新页面重试。');}return;}
@@ -27,7 +27,8 @@ function startBgm(){
   bgmEl.volume=BGM_VOLUME;
   const started=bgmEl.play();
   if(started&&started.catch)started.catch(function(error){
-    if(!bgmWarned){bgmWarned=true;tell('背景音乐未能自动播放（'+error.name+'）。点一下画面任意处即可，或在顶栏点“音乐：开”重试。');}
+    if(isSoundMuted()||save.prefs.music===false)return;
+    if(!bgmWarned){bgmWarned=true;tell('背景音乐未能播放（'+error.name+'）。请关闭后再打开顶部声音开关重试。');}
   });
 }
 function stopBgm(){
@@ -38,7 +39,7 @@ function stopBgm(){
 function pauseBgm(){bgmDucked=true;if(bgmEl)bgmEl.volume=BGM_VOLUME*0.22;}
 function resumeBgm(){bgmDucked=false;if(bgmEl)bgmEl.volume=BGM_VOLUME;}
 function primeAudio(){
-  if(save.prefs.muted)return;
+  if(isSoundMuted())return;
   initAudio();
   startBgm();
 }
@@ -46,14 +47,11 @@ document.addEventListener('pointerdown',primeAudio,true);
 document.addEventListener('keydown',primeAudio,true);
 (function(){
   const box=document.getElementById('music-toggle');
-  if(box)box.addEventListener('change',()=>{
-    save.prefs.music=box.checked;writeSave();
-    if(box.checked)startBgm();else stopBgm();
-  });
+  if(box)box.addEventListener('change',()=>setMusicEnabled(box.checked));
 })();
 /* 只在浏览器空闲时准备音频，绝不占用按键处理 */
 function schedulePrepare(){
-  if(!save.prefs.muted){try{initAudio();}catch(error){}}
+  if(!isSoundMuted()){try{initAudio();}catch(error){}}
   if(window.requestIdleCallback)requestIdleCallback(function(){prepareBgm();},{timeout:2500});
   else setTimeout(prepareBgm,900);
 }
