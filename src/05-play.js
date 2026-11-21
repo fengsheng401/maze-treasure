@@ -87,9 +87,21 @@ for(const type of ['pointerup','pointercancel','lostpointercapture'])$('maze-sta
 $('maze-stage').addEventListener('contextmenu',event=>event.preventDefault());
 $('pause').onclick=togglePause;$('resume').onclick=togglePause;
 $('pause-dialog').addEventListener('close',()=>{lastTick=performance.now();document.body.classList.remove('paused');renderHUD();resumeBgm();$('maze').focus({preventScroll:true});});
-const narrowScreen=matchMedia('(max-width:600px)');
+const landscapeScreen=matchMedia('(max-width:1100px) and (max-height:600px) and (orientation:landscape)');
+const narrowScreen=matchMedia('(max-width:600px), (max-width:1100px) and (max-height:600px) and (orientation:landscape)');
 function updateMenu() {$('game-menu').open=!narrowScreen.matches;}
+function updateGameLayout() {
+  if(landscapeScreen.matches){
+    document.querySelector('.sidebar').prepend($('game-actions'),$('message'),$('below-map'),$('controls'));
+  }else{
+    $('map-viewport').prepend($('message'));
+    document.querySelector('main > section').append($('below-map'));
+    document.querySelector('.sidebar').append($('controls'));
+    $('controls').append($('game-actions'));
+  }
+}
 updateMenu();narrowScreen.addEventListener('change',updateMenu);
+updateGameLayout();landscapeScreen.addEventListener('change',updateGameLayout);
 $('topbar').addEventListener('click',event=>{if(narrowScreen.matches&&event.target.closest('button'))$('game-menu').open=false;});
 $('difficulty').onchange=changeDifficulty;
 $('restart').onclick=restart;$('new-maze').onclick=newMaze;$('undo').onclick=undo;$('hint').onclick=showHint;
@@ -127,7 +139,12 @@ $('endless').onclick=()=>{
     tell(`已退出无尽模式，回到第 ${target} 关。`);
   }else startEndless();
 };
-window.addEventListener('hashchange',loadRequestedLevel);window.addEventListener('resize',()=>{if(state){render();centerPlayer();}if($('stats-dialog').open)drawStatistics();});
+window.addEventListener('hashchange',loadRequestedLevel);window.addEventListener('resize',()=>{if($('stats-dialog').open)drawStatistics();});
+let mapResizeFrame;
+new ResizeObserver(()=>{
+  cancelAnimationFrame(mapResizeFrame);
+  mapResizeFrame=requestAnimationFrame(()=>{if(state){render();centerPlayer();}});
+}).observe($('maze-stage'));
 $('tutorial-done').onclick=finishTutorial;$('tutorial-skip').onclick=finishTutorial;
 /* 点击走：按坐标判定，不依赖命中哪个元素（画布被容器留白/滚动影响时，事件目标常常是容器本身） */
 document.addEventListener('click',event=>{

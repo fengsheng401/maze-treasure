@@ -25,9 +25,11 @@ function fitCell(map){
   const stage=$('maze-stage');
   if(!stage||!map)return;
   const w=stage.clientWidth,h=stage.clientHeight;
-  if(fitMap===map&&Math.abs(fitW-w)<20&&Math.abs(fitH-h)<20)return;
+  if(!w||!h)return;
+  if(fitMap===map&&fitW===w&&fitH===h)return;
   fitMap=map;fitW=w;fitH=h;
-  const availW=Math.max(160,w-38),availH=Math.max(160,h-38);
+  const style=getComputedStyle(stage);
+  const availW=Math.max(1,w-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)),availH=Math.max(1,h-parseFloat(style.paddingTop)-parseFloat(style.paddingBottom));
   const scale=save.prefs.large?1.12:1;
   let cell=Math.min(availW/map.width,availH/map.height)*scale;
   cell=Math.max((replay?lastWin.mode:state.mode)==='endless'?16:14,Math.min(36,Math.floor(cell*2)/2));

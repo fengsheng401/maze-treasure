@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#111713">
 <title>遗迹寻钥 · 迷宫寻宝</title>
@@ -56,6 +56,8 @@
       <div class="difficulty-bar"><label class="small">探险难度 <select id="difficulty" aria-label="探险难度"><option value="casual">休闲</option><option value="standard">标准</option><option value="hardcore">硬核</option></select></label> <span class="status-tag" id="phase">等待出发</span></div>
     </section>
 
+    <p class="orientation-tip"><strong>横屏玩，更舒适</strong><span>转动手机，让地图在左、指南与提示在右。</span></p>
+
     <main>
       <section aria-label="迷宫地图">
         <div class="board">
@@ -94,7 +96,7 @@
         </div>
 
         <div id="below-map">
-          <section class="panel" id="tutorial-panel" hidden style="margin-top:12px;border-color:var(--gold)">
+          <section class="panel" id="tutorial-panel" hidden>
             <h2>三步入门</h2>
             <p id="tutorial-text" role="status" aria-live="polite"></p>
             <div class="actions">
