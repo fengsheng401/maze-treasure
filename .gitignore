@@ -1,0 +1,19 @@
+# ---- 构建产物：由 build.py 重新生成，不进版本库 ----
+/迷宫寻宝.html
+/迷宫寻宝-*.html
+/迷宫寻宝-源码.txt
+
+# ---- 备份与截图 ----
+/备份/
+*.png
+*.jpg
+
+# ---- Python ----
+__pycache__/
+*.pyc
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
