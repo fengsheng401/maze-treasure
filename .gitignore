@@ -6,8 +6,8 @@
 # ---- 备份与截图 ----
 /备份/
 *.png
+!icons/*.png
 *.jpg
-!icons/
 
 # ---- Python ----
 __pycache__/
