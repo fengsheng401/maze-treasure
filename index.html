@@ -1257,6 +1257,13 @@
       scroll-behavior: auto !important;
     }
   }
+
+  /* ===== [04] 访问量统计容器 ===== */
+  /* 不蒜子脚本加载成功后会执行 style.display="inline"，把内联的 display:none 覆盖掉，
+     导致页尾露出"本站总访问量 N 次"。这里用 !important 压住：计数照常上报，文字不显示。 */
+  #busuanzi_container_site_pv {
+    display: none !important;
+  }
   </style>
 </head>
 <!-- ===== [04] 页面结构 ===== -->
