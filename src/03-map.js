@@ -189,9 +189,11 @@ function refreshKeyReach(){
   state.map.keys.forEach((id,i)=>{if(state.collected.has(id)||paths.distances[id]>=0)state.keyReach.add(i);});
 }
 function setBudget() {
+  /* 步数预算仅硬核保留（战役/每日/共享/无尽公式同旧版）；休闲、标准、教程与自定义关卡一律不限步 */
+  const budgetable=['campaign','daily','shared'].includes(state.mode)||state.mode==='endless';
+  if(state.difficulty!=='hardcore'||!budgetable){state.limit=null;return;}
   const walkable=state.map.cells.filter(c=>!c).length;
-  state.limit=['campaign','daily','shared'].includes(state.mode)&&(state.level>=3||state.difficulty==='hardcore')?Math.ceil(walkable*difficultyConfig().budget):null;
-  if(state.mode!=='endless'||(BigInt(state.endlessStage)<BigInt(3)&&state.difficulty!=='hardcore'))return;
+  if(state.mode!=='endless'){state.limit=Math.ceil(walkable*difficultyConfig().budget);return;}
   const path=solveShortest(state.map).path,trapCost=difficultyConfig().trap;
   const traps=new Set(state.map.traps.filter(t=>!t.hardOnly||state.difficulty==='hardcore').map(t=>t.pos)),guardCells=new Set(state.map.guards.reduce((list,g)=>list.concat(g.path),[]));
   let routeCost=path.length-1;
@@ -288,7 +290,8 @@ function loadLevel(level,map=null,mode='campaign',seed=null) {
   if(mode!=='tutorial'){tutorial=null;$('tutorial-panel').hidden=true;}
   seed=seed||(map?'custom':freshSeed(level));
   const difficulty=save.prefs.difficulty||'standard',endlessStage=mode==='endless'?seed.slice(1,seed.indexOf('-')):null;
-  const config=mode==='endless'?endlessConfig(endlessStage,difficulty,seed):LEVELS[level-1];
+  let config=mode==='endless'?endlessConfig(endlessStage,difficulty,seed):LEVELS[level-1];
+  if(mode!=='endless'&&difficulty==='casual'&&CASUAL_SIZES[level])config={...config,width:CASUAL_SIZES[level][0],height:CASUAL_SIZES[level][1]};
   const diffCfg=config.difficulty||DIFFICULTIES[difficulty];
   const keyCount=Math.max(2,config.keys+diffCfg.keys);
   map=map||addDungeon(generateMap(config.width,config.height,keyCount,seededRandom(seed),diffCfg.braid,diffCfg.spread),seededRandom(seed+'-dungeon'),level,diffCfg);

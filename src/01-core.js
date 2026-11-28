@@ -47,6 +47,10 @@ const DIFFICULTIES={
   hardcore:{name:'硬核',radius:9,budget:1.6,trap:4,braid:0.14,traps:1,guards:1,keys:0,spread:0.95}
 };
 const ITEM_NAMES={torch:'火把',map:'地图碎片',compass:'罗盘'};
+/* 休闲档专用尺寸曲线（仅休闲档生效，标准/硬核仍用 LEVELS 原表）：
+   前五关面积增幅放缓到每级约 +25%，砍掉原 L5 的 61×61 峰值；
+   钥匙数不变（休闲档本来就在 LEVELS.keys 基础上再减 1）。 */
+const CASUAL_SIZES={1:[27,19],2:[33,21],3:[35,25],4:[39,29],5:[43,33]};
 const LOCK_SIGNS=['Ⅰ','Ⅱ','Ⅲ','Ⅳ','Ⅴ','Ⅵ','Ⅶ','Ⅷ'];
 const DEFAULT_KEYS = {ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right'};
 let state, lastWin = null, lastTick = performance.now();
