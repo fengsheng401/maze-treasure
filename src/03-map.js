@@ -1,7 +1,6 @@
 /* ===== 03-map.js — 地图生成 / 点击自动行走 / 视野与光照 ===== */
 
 /* ===== [J3] 关卡编辑器 ===== */
-let draft=null,editorCursor=0,painting=false;
 function validateMap(input) {
   if(!input||input.version!==1||!Number.isInteger(input.width)||!Number.isInteger(input.height)||input.width<5||input.height<5||input.width>61||input.height>61)throw new Error('宽高必须为 5—61 的整数');
   const size=input.width*input.height;
@@ -29,44 +28,6 @@ function validateMap(input) {
   if(!canCompleteMap(map))throw new Error('门钥匙形成死锁，无法通关');
   return map;
 }
-function showEditor() {
-  draft={...state.map,cells:[...state.map.cells],keys:[...state.map.keys]};editorCursor=draft.start;
-  $('editor-width').value=draft.width;$('editor-height').value=draft.height;$('editor-dialog').showModal();renderEditor();
-}
-function blankEditor() {
-  const width=Number($('editor-width').value),height=Number($('editor-height').value);
-  if(!Number.isInteger(width)||!Number.isInteger(height)||width<5||height<5||width>61||height>61){$('editor-validation').textContent='宽高必须为 5—61 的整数';return;}
-  draft={version:1,width,height,cells:Array.from({length:width*height},(_,id)=>id<width||id>=width*(height-1)||id%width===0||id%width===width-1?1:0),start:null,exit:null,keys:[]};editorCursor=width+1;renderEditor();
-}
-function renderEditor() {
-  const canvas=$('editor-canvas'),cell=save.prefs.large?28:20,ctx=canvas.getContext('2d'),colors=getComputedStyle(document.documentElement);
-  canvas.width=draft.width*cell;canvas.height=draft.height*cell;ctx.fillStyle=colors.getPropertyValue('--unknown');ctx.fillRect(0,0,canvas.width,canvas.height);ctx.font=(save.prefs.large?'21px':'15px')+' Consolas,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
-  for(let id=0;id<draft.cells.length;id++) {const key=draft.keys.indexOf(id);let char=draft.cells[id]?'#':'·',color='--wall';if(id===draft.start){char='@';color='--green';}else if(id===draft.exit){char='E';color='--green';}else if(key>=0){char=String(key+1);color='--gold';}ctx.fillStyle=colors.getPropertyValue(color);ctx.fillText(char,(id%draft.width)*cell+cell/2,Math.floor(id/draft.width)*cell+cell/2);}
-  const markers=[...(draft.doors||[]).map(d=>[d.pos,LOCK_SIGNS[d.key]]),...(draft.items||[]).map(i=>[i.pos,{torch:'T',map:'M',compass:'C'}[i.type]]),...(draft.chests||[]).map(c=>[c.pos,'▣']),...(draft.traps||[]).map(t=>[t.pos,'△']),...(draft.guards||[]).map(g=>[g.path[0],'G'])];
-  for(const [id,char] of markers){ctx.fillStyle=colors.getPropertyValue('--unknown');ctx.fillRect(id%draft.width*cell,Math.floor(id/draft.width)*cell,cell,cell);ctx.fillStyle=colors.getPropertyValue('--gold');ctx.fillText(char,id%draft.width*cell+cell/2,Math.floor(id/draft.width)*cell+cell/2);}
-  ctx.strokeStyle=colors.getPropertyValue('--gold');ctx.strokeRect((editorCursor%draft.width)*cell+1,Math.floor(editorCursor/draft.width)*cell+1,cell-2,cell-2);
-  try{validateMap(draft);$('editor-validation').textContent='校验通过：起点、钥匙、出口均可达。';$('editor-validation').style.color='var(--green)';canvas.style.outline='1px solid var(--line)';$('editor-play').disabled=false;}
-  catch(error){$('editor-validation').textContent=error.message;$('editor-validation').style.color='var(--danger)';canvas.style.outline='2px solid var(--danger)';$('editor-play').disabled=true;}
-  canvas.setAttribute('aria-label',`关卡画布，光标在第 ${Math.floor(editorCursor/draft.width)+1} 行 ${editorCursor%draft.width+1} 列。方向键移动光标，空格绘制。`);
-}
-function paintCell(id) {
-  if(!draft||id<0||id>=draft.cells.length)return;
-  const tool=$('editor-tool').value;
-  if(tool==='key'&&!draft.keys.includes(id)&&draft.keys.length>=8){$('editor-validation').textContent='最多放置 8 把钥匙；请先擦除一把。';return;}
-  const removedKey=draft.keys.indexOf(id);
-  if(removedKey>=0)draft.doors=draft.doors?draft.doors.filter(d=>d.key!==removedKey).map(d=>({...d,key:d.key>removedKey?d.key-1:d.key})):undefined;
-  for(const field of ['doors','items','traps','chests'])if(draft[field])draft[field]=draft[field].filter(v=>v.pos!==id);
-  if(draft.guards)draft.guards=draft.guards.filter(g=>!g.path.includes(id));
-  draft.keys=draft.keys.filter(key=>key!==id);if(draft.start===id)draft.start=null;if(draft.exit===id)draft.exit=null;
-  draft.cells[id]=tool==='wall'?1:0;
-  if(tool==='start')draft.start=id;if(tool==='exit')draft.exit=id;if(tool==='key')draft.keys.push(id);
-  editorCursor=id;renderEditor();
-}
-function paintPointer(event) {
-  const rect=$('editor-canvas').getBoundingClientRect(),x=Math.floor((event.clientX-rect.left)*draft.width/rect.width),y=Math.floor((event.clientY-rect.top)*draft.height/rect.height);
-  if(x>=0&&x<draft.width&&y>=0&&y<draft.height)paintCell(y*draft.width+x);
-}
-function playDraft() {try{const map=validateMap(draft);$('editor-dialog').close();loadLevel(1,map,'custom');tell('自定义关卡试玩中；重新打开编辑器可继续修改。');}catch(error){$('editor-validation').textContent=error.message;}}
 
 function formatTime(ms) {const s=Math.floor(ms/1000);return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
 function adjacent(map,id) {

@@ -73,7 +73,7 @@ function recordStatistics() {
 function showStatistics() {
   $('endless-summary').textContent=`无尽模式 · 最高通关：${save.endless.highestStage==='0'?'尚未通关':'第 '+save.endless.highestStage+' 关'} · 累计通关：${save.endless.wins} 次（独立统计）`;
   const stats=save.stats;$('stats-summary').textContent=`总步数：${stats.totalSteps}　总通关：${stats.wins}　最快：${stats.fastest===null?'暂无':formatTime(stats.fastest)}　最长连续通关：${stats.bestStreak}`;
-  setChildren($('achievement-list'),ACHIEVEMENTS.map(([id,title])=>{const li=document.createElement('li');li.textContent=(stats.achievements.includes(id)?'已达成 · ':'未达成 · ')+title;li.style.color=stats.achievements.includes(id)?'var(--gold)':'var(--muted)';return li;}));$('stats-dialog').showModal();const streak=dailyStreak();$('daily-streak').textContent=`每日挑战 · 当前连续 ${streak.current} 天 / 历史最长 ${streak.best} 天（通关记打卡，断一天归零）`;drawStatistics();
+  setChildren($('achievement-list'),ACHIEVEMENTS.map(([id,title])=>{const li=document.createElement('li');li.textContent=(stats.achievements.includes(id)?'已达成 · ':'未达成 · ')+title;li.style.color=stats.achievements.includes(id)?'var(--gold)':'var(--muted)';return li;}));$('stats-dialog').showModal();drawStatistics();
 }
 function drawStatistics() {
   const canvas=$('stats-chart'),width=Math.max(240,canvas.clientWidth),height=180,ratio=Math.min(devicePixelRatio||1,2),ctx=canvas.getContext('2d'),style=getComputedStyle(document.documentElement),values=save.stats.recent;
@@ -105,12 +105,12 @@ function normalizeSave(raw) {
   if(raw.tutorialDone!==undefined&&typeof raw.tutorialDone!=='boolean')throw new Error('教程状态无效');
   for(const key of ['muted','contrast','large'])if(raw.prefs&&raw.prefs[key]!==undefined&&typeof raw.prefs[key]!=='boolean')throw new Error('偏好设置无效');
   const prefs=raw.prefs||{};
-  return {version:1,mapGen:raw.mapGen===2?2:1,current:raw.current,unlocked:raw.unlocked,bests,daily,stats:normalizeStats(raw.stats),endless:normalizeEndless(raw.endless),tutorialDone:raw.tutorialDone===true,prefs:{difficulty:Object.prototype.hasOwnProperty.call(DIFFICULTIES,prefs.difficulty)?prefs.difficulty:'standard',keyMode:['both','arrows','wasd','custom'].includes(prefs.keyMode)?prefs.keyMode:'both',bindings:normalizeBindings(prefs.bindings),muted:prefs.muted===true,music:prefs.music!==false,sideFs:Number.isInteger(prefs.sideFs)?Math.max(10,Math.min(17,prefs.sideFs)):12,contrast:prefs.contrast===true,large:prefs.large===true,skin:['ruins','forest','space','purple','emerald'].includes(prefs.skin)?prefs.skin:'ruins',avatarSkin:['original','red','orange','yellow','green','blue','indigo','violet'].includes(prefs.avatarSkin)?prefs.avatarSkin:'original'}};
+  return {version:1,mapGen:raw.mapGen===2?2:1,current:raw.current,unlocked:raw.unlocked,bests,daily,stats:normalizeStats(raw.stats),endless:normalizeEndless(raw.endless),tutorialDone:raw.tutorialDone===true,prefs:{difficulty:Object.prototype.hasOwnProperty.call(DIFFICULTIES,prefs.difficulty)?prefs.difficulty:'standard',keyMode:['both','arrows','wasd','custom'].includes(prefs.keyMode)?prefs.keyMode:'both',bindings:normalizeBindings(prefs.bindings),muted:prefs.muted===true,music:prefs.music!==false,sideFs:Number.isInteger(prefs.sideFs)?Math.max(10,Math.min(17,prefs.sideFs)):12,contrast:prefs.contrast===true,large:prefs.large===true,skin:['ruins','forest','space','purple','emerald'].includes(prefs.skin)?prefs.skin:'ruins',avatarSkin:['original','red','orange','yellow','green','blue','indigo','violet'].includes(prefs.avatarSkin)?prefs.avatarSkin:'original',bgmTrack:Number.isInteger(prefs.bgmTrack)?Math.max(0,Math.min(2,prefs.bgmTrack)):0}};
 }
 function readSave() {
   try {const text=localStorage.getItem(SAVE_KEY);if(text)return normalizeSave(JSON.parse(text));}
   catch(error){storageWarning='本地存档不可用或已损坏；本次仍可游玩。';}
-  return {version:1,current:1,unlocked:1,bests:{},daily:{},stats:emptyStats(),endless:normalizeEndless(),tutorialDone:false,mapGen:2,prefs:{difficulty:'standard',muted:false,music:true,sideFs:12,skin:'ruins',avatarSkin:'original',contrast:false,large:false,keyMode:'both',bindings:{...DEFAULT_BINDINGS}}};
+  return {version:1,current:1,unlocked:1,bests:{},daily:{},stats:emptyStats(),endless:normalizeEndless(),tutorialDone:false,mapGen:2,prefs:{difficulty:'standard',muted:false,music:true,bgmTrack:0,sideFs:12,skin:'ruins',avatarSkin:'original',contrast:false,large:false,keyMode:'both',bindings:{...DEFAULT_BINDINGS}}};
 }
 function writeSave() {try{localStorage.setItem(SAVE_KEY,JSON.stringify(save));}catch(error){storageWarning='浏览器未允许本地存档，请允许存储后重试。';tell(storageWarning);}}
 let hintCells=new Set(),hintTimer=null;
@@ -159,13 +159,13 @@ function applyPreferences() {
   $('music').setAttribute('aria-label',musicOn?'关闭背景音乐':'开启背景音乐');
   document.documentElement.dataset.skin=save.prefs.skin;$('skin').value=save.prefs.skin;
   document.documentElement.dataset.avatarSkin=save.prefs.avatarSkin;$('avatar-skin').value=save.prefs.avatarSkin;
-  document.documentElement.dataset.contrast=String(save.prefs.contrast);document.documentElement.dataset.large=String(save.prefs.large);$('high-contrast').checked=save.prefs.contrast;$('large-text').checked=save.prefs.large;$('music-toggle').checked=musicOn;
+  document.documentElement.dataset.contrast=String(save.prefs.contrast);document.documentElement.dataset.large=String(save.prefs.large);$('high-contrast').checked=save.prefs.contrast;$('large-toggle').textContent=save.prefs.large?'大字：开':'大字：关';$('large-toggle').setAttribute('aria-pressed',String(save.prefs.large));$('music-toggle').checked=musicOn;$('bgm-track').value=String(save.prefs.bgmTrack||0);
   $('mute').setAttribute('aria-label',muted?'开启音乐和音效':'关闭所有声音');
   $('key-mode').value=save.prefs.keyMode;$('custom-bindings').hidden=save.prefs.keyMode!=='custom';
   const names={both:'方向键 / WASD',arrows:'方向键 ↑ ↓ ← →',wasd:'W A S D',custom:'自定义 '+Object.entries(save.prefs.bindings).map(([dir,key])=>({up:'上',down:'下',left:'左',right:'右'}[dir])+': '+(key===' '?'Space':key)).join(' / ')};
   $('key-help').innerHTML=`${names[save.prefs.keyMode]} 移动，按住连走。<br><strong>点一下看得见的格子，会自动走过去</strong>（按方向键即停）。<br>集齐全部钥匙后走入 <strong>E</strong> 通关。`;
   $('hint').textContent=directionFor('h')?'提示（按钮）':'提示 H';
-  if(state){render();centerPlayer();}if($('editor-dialog').open)renderEditor();if($('stats-dialog').open)drawStatistics();
+  if(state){render();centerPlayer();}if($('stats-dialog').open)drawStatistics();
 }
 function toggleMute() {
   const enabled=isSoundMuted();soundOptIn=true;save.prefs.muted=!enabled;
@@ -188,7 +188,7 @@ function dailyStreak(records=save.daily,today=todayUTC()) {
   for(const day of days){run=day===last+1?run+1:1;best=Math.max(best,run);last=day;}
   const now=Date.parse(today+'T00:00:00Z')/86400000;return {current:last===now||last===now-1?run:0,best};
 }
-function updateDailyStatus() {const streak=dailyStreak();$('daily').textContent=(save.daily[todayUTC()]?'今日已打卡':'今日挑战')+` · 连续 ${streak.current} 天`;}
+function updateDailyStatus() {const el=$('daily');if(!el)return;const streak=dailyStreak();el.textContent=(save.daily[todayUTC()]?'今日已打卡':'今日挑战')+` · 连续 ${streak.current} 天`;}
 function startDaily() {const date=todayUTC();loadLevel(3,null,'daily','L3-daily-'+date);tell(`${date}（本地时间 0 点换日）每日挑战。${save.daily[date]?'今日已记成绩，本次仅练习。':'首次通关记入今日成绩，再次挑战不覆盖。'}`);}
 function recordLevel() {
   if(state.mode==='daily') {const date=dailyDate(state.seed);if(date&&!save.daily[date]){save.daily[date]={steps:state.moves,time:state.elapsed,hints:state.hints};writeSave();}updateDailyStatus();return;}
@@ -255,7 +255,7 @@ function decodeMap(code) {
   try{data=JSON.parse(text);}catch(error){throw new Error('关卡数据已损坏，无法解析');}
   return validateMap(data);
 }
-function exportMap(map=state.map) {try{$('map-code').value=encodeMap(map);if($('editor-dialog').open)$('editor-dialog').close();if(!$('transfer-dialog').open)$('transfer-dialog').showModal();$('transfer-status').textContent='关卡代码已生成，可复制给别人导入。';}catch(error){tell(error.message);}}
+function exportMap(map=state.map) {try{$('map-code').value=encodeMap(map);if(!$('transfer-dialog').open)$('transfer-dialog').showModal();$('transfer-status').textContent='关卡代码已生成，可复制给别人导入。';}catch(error){tell(error.message);}}
 function importMap() {try{const map=decodeMap($('map-code').value.trim());$('transfer-dialog').close();loadLevel(1,map,'custom');tell('关卡导入成功，可以直接游玩。');}catch(error){$('transfer-status').textContent='导入失败：'+error.message;}}
 function downloadJSON(value,name) {
   const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'})),link=document.createElement('a');link.href=url;link.download=name;link.setAttribute('aria-label','下载存档');document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);

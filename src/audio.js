@@ -1,28 +1,49 @@
-/* 背景音乐：内嵌 mp3（96k），交给 <audio> 播，主线程不做解码，避免卡按键 */
-let bgmEl=null,bgmUrl=null,bgmDucked=false,bgmPreparing=false;
+/* 背景音乐：三首内嵌音频（原曲 MP3 + 两首 AAC），解码成 Blob 交给 <audio> 播，主线程不做实时解码，避免卡按键 */
+let bgmEl=null,bgmDucked=false,bgmWarned=false,bgmPreparing=false,bgmPrepared=false;
+const bgmUrls=[];
 const BGM_VOLUME=0.5;
-function prepareBgm(){
-  if(bgmUrl)return bgmUrl;
-  if(bgmPreparing)return null;
-  const holder=document.getElementById('bgm-data');
-  if(!holder)return null;
-  bgmPreparing=true;
-  try{
-    const bin=atob(holder.textContent.replace(/\s+/g,''));
-    const bytes=new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
-    bgmUrl=URL.createObjectURL(new Blob([bytes],{type:'audio/mpeg'}));
-    holder.textContent='';
-    return bgmUrl;
-  }catch(error){bgmPreparing=false;return null;}
+/* 顺序必须与 index.html 里 #bgm-data 用 | 分隔的顺序一致 */
+const BGM_TRACKS=[
+  {name:'原曲 · 午后',mime:'audio/mpeg'},
+  {name:'Sugar Rush Quest',mime:'audio/mp4'},
+  {name:'Before the Map Unfolds',mime:'audio/mp4'}
+];
+function bgmTrackIndex(){
+  const t=save.prefs.bgmTrack;
+  return (Number.isInteger(t)&&t>=0&&t<BGM_TRACKS.length)?t:0;
 }
-let bgmWarned=false;
+/* 一次性把三段 base64 都解成 Blob URL，随后清空 DOM 里的长文本省内存 */
+function prepareBgm(){
+  if(bgmPrepared)return bgmUrls.length>0;
+  if(bgmPreparing)return false;
+  const holder=document.getElementById('bgm-data');
+  if(!holder||!holder.textContent)return false;
+  bgmPreparing=true;
+  let ok=false;
+  try{
+    const parts=holder.textContent.replace(/\s+/g,'').split('|');
+    for(let i=0;i<parts.length&&i<BGM_TRACKS.length;i++){
+      if(!parts[i])continue;
+      const bin=atob(parts[i]);
+      const bytes=new Uint8Array(bin.length);
+      for(let j=0;j<bin.length;j++)bytes[j]=bin.charCodeAt(j);
+      bgmUrls[i]=URL.createObjectURL(new Blob([bytes],{type:BGM_TRACKS[i].mime}));
+      ok=true;
+    }
+    holder.textContent='';
+  }catch(error){bgmPreparing=false;return false;}
+  bgmPreparing=false;
+  if(ok)bgmPrepared=true;
+  return ok;
+}
 function startBgm(){
   if(isSoundMuted()||save.prefs.music===false)return;
   if(bgmEl&&!bgmEl.paused)return;
-  const url=bgmUrl||prepareBgm();
-  if(!url){if(!bgmWarned){bgmWarned=true;tell('背景音乐数据未能读取，请刷新页面重试。');}return;}
-  if(!bgmEl){bgmEl=new Audio(url);bgmEl.loop=true;bgmEl.preload='auto';}
+  const idx=bgmTrackIndex();
+  if(!bgmUrls[idx]&&!prepareBgm()){if(!bgmWarned){bgmWarned=true;tell('背景音乐数据未能读取，请刷新页面重试。');}return;}
+  if(!bgmUrls[idx])return;
+  if(!bgmEl){bgmEl=new Audio(bgmUrls[idx]);bgmEl.loop=true;bgmEl.preload='auto';}
+  else if(bgmEl.src!==bgmUrls[idx]){bgmEl.src=bgmUrls[idx];bgmEl.loop=true;}
   bgmDucked=false;
   bgmEl.volume=BGM_VOLUME;
   const started=bgmEl.play();
@@ -38,6 +59,18 @@ function stopBgm(){
 }
 function pauseBgm(){bgmDucked=true;if(bgmEl)bgmEl.volume=BGM_VOLUME*0.22;}
 function resumeBgm(){bgmDucked=false;if(bgmEl)bgmEl.volume=BGM_VOLUME;}
+/* 切换曲目：记住选择；若正在播放则换到新曲，否则只记下来，下次播放生效 */
+function setBgmTrack(value){
+  let idx=Number(value);
+  if(!Number.isInteger(idx)||idx<0||idx>=BGM_TRACKS.length)idx=0;
+  if(bgmTrackIndex()===idx&&bgmEl)return;
+  save.prefs.bgmTrack=idx;
+  writeSave();
+  const wasPlaying=!!(bgmEl&&!bgmEl.paused);
+  if(bgmEl){try{bgmEl.pause();}catch(error){}bgmEl=null;}
+  bgmWarned=false;
+  if(wasPlaying&&!isSoundMuted()&&save.prefs.music!==false)startBgm();
+}
 function primeAudio(){
   if(isSoundMuted())return;
   initAudio();
@@ -48,6 +81,8 @@ document.addEventListener('keydown',primeAudio,true);
 (function(){
   const box=document.getElementById('music-toggle');
   if(box)box.addEventListener('change',()=>setMusicEnabled(box.checked));
+  const sel=document.getElementById('bgm-track');
+  if(sel)sel.addEventListener('change',()=>setBgmTrack(sel.value));
 })();
 /* 只在浏览器空闲时准备音频，绝不占用按键处理 */
 function schedulePrepare(){

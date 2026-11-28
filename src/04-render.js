@@ -129,20 +129,8 @@ function render() {
     ctx.restore();
     ctx.globalAlpha=1;
   }
-  positionAvatar(view);syncProps(view);renderMinimap(view);renderHUD();lastRenderMs=performance.now()-started;
+  positionAvatar(view);syncProps(view);renderHUD();lastRenderMs=performance.now()-started;
   $('render-cost').textContent=`最近绘制 ${lastRenderMs.toFixed(2)} ms / ${lastRenderCells} 格 · Canvas 差量重绘`;
-}
-function renderMinimap(view) {
-  const box=$('minimap-box'),stage=$('maze-stage');
-  box.hidden=(replay?lastWin.mode:state.mode)==='endless'?stage.scrollWidth<=stage.clientWidth&&stage.scrollHeight<=stage.clientHeight:state.level<11&&view.map.width<45;if(box.hidden)return;
-  const playerX=view.pos%view.map.width*cellMetrics().width+$('maze-frame').offsetLeft-stage.scrollLeft;
-  box.style.left=playerX>stage.clientWidth/2?'10px':'auto';box.style.right=playerX>stage.clientWidth/2?'auto':'10px';
-  const canvas=$('minimap'),ctx=canvas.getContext('2d'),size=3,style=getComputedStyle(document.documentElement);canvas.width=view.map.width*size;canvas.height=view.map.height*size;
-  ctx.fillStyle=style.getPropertyValue('--unknown');ctx.fillRect(0,0,canvas.width,canvas.height);
-  for(const id of view.seen){ctx.fillStyle=style.getPropertyValue(view.map.cells[id]?'--wall-edge':'--floor');ctx.fillRect(id%view.map.width*size,Math.floor(id/view.map.width)*size,size,size);}
-  if(view.seen.has(view.map.exit)){ctx.fillStyle='#9ce8b3';ctx.fillRect(view.map.exit%view.map.width*size,Math.floor(view.map.exit/view.map.width)*size,size,size);}
-  ctx.fillStyle='#ffd3ad';ctx.fillRect(view.pos%view.map.width*size-1,Math.floor(view.pos/view.map.width)*size-1,size+2,size+2);
-  canvas.setAttribute('aria-label',`小地图：已知 ${view.seen.size} 格，当前位置 ${view.pos%view.map.width+1} 列 ${Math.floor(view.pos/view.map.width)+1} 行`);
 }
 function renderHUD() {
   $('steps').textContent=state.moves;$('timer').textContent=formatTime(state.elapsed);$('collected').textContent=`${state.collected.size} / ${state.map.keys.length}`;

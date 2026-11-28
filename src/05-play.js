@@ -154,11 +154,6 @@ $('stats-open').onclick=showStatistics;$('clear-stats').onclick=clearStatistics;
 $('level-select').onclick=showLevels;
 document.addEventListener('click',event=>{const close=event.target.closest('[data-close]');if(close)$(close.dataset.close).close();});
 if($('copy-link'))$('copy-link').onclick=copyLevelLink;
-$('editor-open').onclick=showEditor;$('editor-blank').onclick=blankEditor;$('editor-play').onclick=playDraft;
-$('editor-canvas').addEventListener('pointerdown',event=>{painting=true;event.currentTarget.setPointerCapture(event.pointerId);paintPointer(event);});
-$('editor-canvas').addEventListener('pointermove',event=>{if(painting)paintPointer(event);});
-$('editor-canvas').addEventListener('pointerup',()=>painting=false);$('editor-canvas').addEventListener('pointercancel',()=>painting=false);
-$('editor-canvas').addEventListener('keydown',event=>{const dir=DEFAULT_KEYS[event.key];if(dir){event.preventDefault();const [dx,dy]=DIRS[dir],x=Math.max(0,Math.min(draft.width-1,editorCursor%draft.width+dx)),y=Math.max(0,Math.min(draft.height-1,Math.floor(editorCursor/draft.width)+dy));editorCursor=y*draft.width+x;renderEditor();}else if(event.key===' '||event.key==='Enter'){event.preventDefault();paintCell(editorCursor);}});
 function loadRequestedLevel() {
   const code=new URLSearchParams(location.hash.slice(1)).get('map');
   if(code){try{loadLevel(1,decodeMap(code),'custom');}catch(error){loadLevel(save.current);tell('链接关卡无效：'+error.message);}return;}
@@ -167,10 +162,9 @@ function loadRequestedLevel() {
   if(request)loadLevel(request.level,null,dailyDate(request.seed)?'daily':request.level>save.unlocked?'shared':'campaign',request.seed);else loadLevel(save.current);
 }
 $('transfer-open').onclick=()=>{$('transfer-status').textContent='';$('transfer-dialog').showModal();};
-$('export-map').onclick=()=>exportMap();$('editor-export').onclick=()=>exportMap(draft);$('import-map').onclick=importMap;$('copy-map').onclick=()=>copyText($('map-code').value);
+$('export-map').onclick=()=>exportMap();$('import-map').onclick=importMap;$('copy-map').onclick=()=>copyText($('map-code').value);
 $('export-save').onclick=()=>downloadJSON(save,'迷宫寻宝-存档-'+todayUTC()+'.json');$('import-save').onclick=()=>$('save-file').click();$('save-file').onchange=event=>importSaveFile(event.target.files[0]);
 $('confirm-yes').onclick=()=>{const action=confirmAction;confirmAction=null;$('confirm-dialog').close();if(action)action();};$('confirm-dialog').addEventListener('close',()=>confirmAction=null);
-$('daily').onclick=startDaily;updateDailyStatus();
 $('endless').onclick=()=>{
   if(state&&state.mode==='endless'){
     const target=Math.max(1,Math.min(save.current||1,LEVELS.length));
@@ -216,7 +210,7 @@ function labelControls(root=document) {
 }
 $('settings-open').onclick=()=>{showKeySettings();$('settings-dialog').showModal();};
 $('key-mode').onchange=()=>{save.prefs.keyMode=$('key-mode').value;writeSave();applyPreferences();showKeySettings();};document.querySelectorAll('[data-bind]').forEach(input=>input.addEventListener('keydown',captureBinding));$('save-bindings').onclick=commitBindings;
-$('high-contrast').onchange=()=>{save.prefs.contrast=$('high-contrast').checked;writeSave();applyPreferences();};$('large-text').onchange=()=>{save.prefs.large=$('large-text').checked;writeSave();applyPreferences();};
+$('high-contrast').onchange=()=>{save.prefs.contrast=$('high-contrast').checked;writeSave();applyPreferences();};$('large-toggle').onclick=()=>{save.prefs.large=!save.prefs.large;writeSave();applyPreferences();};
 labelControls();new MutationObserver(records=>{for(const record of records)for(const node of record.addedNodes)if(node.nodeType===1){if(node.matches('button,input,select,textarea,a[href],[tabindex]')&&!node.hasAttribute('aria-label'))node.setAttribute('aria-label',(node.textContent||node.id).trim());labelControls(node);}}).observe(document.body,{childList:true,subtree:true});
 $('skin').onchange=()=>{save.prefs.skin=$('skin').value;writeSave();applyPreferences();};
 $('avatar-skin').onchange=()=>{save.prefs.avatarSkin=$('avatar-skin').value;writeSave();applyPreferences();};
