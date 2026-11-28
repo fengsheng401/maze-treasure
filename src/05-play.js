@@ -40,7 +40,7 @@ function undo() {
 }
 function restart() {loadLevel(state.level,state.map,state.mode,state.seed);$('maze').focus({preventScroll:true});}
 function newMaze() {if(state.mode==='endless')startEndless(state.endlessStage);else if(state.mode==='daily')loadLevel(3,null,'daily',state.seed);else loadLevel(state.level,null,state.mode==='shared'?'shared':'campaign');$('maze').focus({preventScroll:true});}
-let moveHold=null,holdTimer=null,gesture=null;
+let moveHold=null,holdTimer=null,gesture=null,gestureMoved=false,gestureResetTimer=null;
 function stopMovement() {clearTimeout(holdTimer);moveHold=null;}
 function beginMovement(direction,source) {
   stopMovement();if(!state||!['ready','playing'].includes(state.status)||replay||document.querySelector('dialog[open]'))return;
@@ -74,16 +74,18 @@ document.querySelectorAll('[data-direction]').forEach(button=>{
 });
 $('maze-stage').addEventListener('pointerdown',event=>{
   if(!event.isPrimary||event.button!==0){stopMovement();gesture=null;return;}
+  clearTimeout(gestureResetTimer);gestureMoved=false;
   event.preventDefault();gesture={id:event.pointerId,x:event.clientX,y:event.clientY,direction:null};event.currentTarget.setPointerCapture(event.pointerId);
 });
 $('maze-stage').addEventListener('pointermove',event=>{
   if(!gesture||gesture.id!==event.pointerId)return;event.preventDefault();
   const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
   if(Math.max(Math.abs(dx),Math.abs(dy))<20){stopMovement();gesture.direction=null;return;}
+  gestureMoved=true;
   const direction=Math.abs(dx)>Math.abs(dy)?dx>0?'right':'left':dy>0?'down':'up';
   if(direction!==gesture.direction){gesture.direction=direction;beginMovement(direction,'gesture:'+event.pointerId);}
 });
-for(const type of ['pointerup','pointercancel','lostpointercapture'])$('maze-stage').addEventListener(type,event=>{if(gesture&&gesture.id===event.pointerId){gesture=null;stopMovement();}});
+for(const type of ['pointerup','pointercancel','lostpointercapture'])$('maze-stage').addEventListener(type,event=>{if(gesture&&gesture.id===event.pointerId){gesture=null;stopMovement();if(gestureMoved)gestureResetTimer=setTimeout(()=>{gestureMoved=false;},60);}});
 $('maze-stage').addEventListener('contextmenu',event=>event.preventDefault());
 $('pause').onclick=togglePause;$('resume').onclick=togglePause;
 $('pause-dialog').addEventListener('close',()=>{lastTick=performance.now();document.body.classList.remove('paused');renderHUD();resumeBgm();$('maze').focus({preventScroll:true});});
@@ -185,6 +187,7 @@ else window.addEventListener('resize',onStageResize);
 $('tutorial-done').onclick=finishTutorial;$('tutorial-skip').onclick=finishTutorial;
 /* 点击走：按坐标判定，不依赖命中哪个元素（画布被容器留白/滚动影响时，事件目标常常是容器本身） */
 document.addEventListener('click',event=>{
+  if(gestureMoved){clearTimeout(gestureResetTimer);gestureMoved=false;return;}
   if(!state||!state.map||replay)return;
   const view=$('maze');
   if(!view)return;

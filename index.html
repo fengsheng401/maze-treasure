@@ -1087,6 +1087,15 @@
     content: ''; position: absolute; left: -70%; top: -20%; width: 240%; height: 24%;
     background: #d3dde8; clip-path: polygon(50% 0, 100% 100%, 0 100%);
   }
+  .prop.guard.stunned {
+    opacity: .48;
+    filter: grayscale(.45);
+    animation: guardStun .45s ease-in-out infinite alternate;
+  }
+  @keyframes guardStun {
+    from { transform: rotate(-10deg) translateY(1px); }
+    to { transform: rotate(10deg) translateY(1px); }
+  }
 
   /* 锁门：石框 + 编号，锁着暗红，开了变金 */
   .prop.gate::before, .prop.gate-open::before {
@@ -2240,8 +2249,9 @@ function traceStep() {return {pos:state.pos,collected:[...state.collected],guard
 const shortestCache=new WeakMap();
 function solveShortest(map) {
   if(shortestCache.has(map))return shortestCache.get(map);
-  const size=map.cells.length,full=(1<<map.keys.length)-1,total=size*(full+1),bits=new Uint16Array(size),parents=new Int32Array(total).fill(-2),queue=new Int32Array(total);
+  const size=map.cells.length,full=(1<<map.keys.length)-1,total=size*(full+1),bits=new Uint16Array(size),doorKeys=new Int8Array(size).fill(-1),parents=new Int32Array(total).fill(-2),queue=new Int32Array(total);
   map.keys.forEach((id,index)=>bits[id]=1<<index);
+  if(map.doors)map.doors.forEach(d=>doorKeys[d.pos]=d.key);
   const neighbors=map.cells.map((wall,id)=>wall?[]:adjacent(map,id).filter(next=>!map.cells[next]));
   let head=0,tail=1;queue[0]=map.start;parents[map.start]=-1;
   while(head<tail) {
@@ -2251,7 +2261,7 @@ function solveShortest(map) {
       const result={steps:path.length-1,path};shortestCache.set(map,result);return result;
     }
     for(const next of neighbors[pos]) {
-      const door=map.doors&&map.doors.find(d=>d.pos===next);if(door&&!(mask&(1<<door.key)))continue;
+      const doorKey=doorKeys[next];if(doorKey>=0&&!(mask&(1<<doorKey)))continue;
       const nextMask=mask|bits[next];if(next===map.exit&&nextMask!==full)continue;
       const code=nextMask*size+next;if(parents[code]!==-2)continue;parents[code]=encoded;queue[tail++]=code;
     }
@@ -2362,11 +2372,11 @@ function syncProps(view){
   if(!layer)return;
   if(propMap!==view.map){for(const el of propCache.values())el.remove();propCache.clear();propMap=view.map;}
   const cell=cellMetrics(),W=view.map.width,list=new Map();
-  const add=(pos,kind)=>list.set(pos+':'+kind,{pos,kind});
+  const add=(pos,kind,stun=false)=>list.set(pos+':'+kind,{pos,kind,stun});
   (view.map.items||[]).forEach(item=>{if(view.takenItems&&view.takenItems.has(item.pos))return;if(view.visible.has(item.pos))add(item.pos,'item-'+item.type);});
   (view.map.chests||[]).forEach(chest=>{if(view.visible.has(chest.pos))add(chest.pos,view.openedChests&&view.openedChests.has(chest.pos)?'chest-open':'chest');});
   (view.map.traps||[]).forEach(trap=>{if(trap.hardOnly&&view.difficulty!=='hardcore')return;if(view.visible.has(trap.pos))add(trap.pos,'trap');});
-  (view.guards||[]).forEach((guard,i)=>{const pos=view.map.guards[i].path[guard.index];if(view.visible.has(pos))add(pos,'guard');});
+  (view.guards||[]).forEach((guard,i)=>{const pos=view.map.guards[i].path[guard.index];if(view.visible.has(pos))add(pos,'guard',guard.stun>0);});
   (view.map.doors||[]).forEach(door=>{if(!view.seen.has(door.pos))return;add(door.pos,view.collected.has(view.map.keys[door.key])?'gate-open':'gate');});
   for(const [key,el] of propCache){if(!list.has(key)){el.remove();propCache.delete(key);}}
   for(const [key,item] of list){
@@ -2379,6 +2389,7 @@ function syncProps(view){
       layer.append(el);
       propCache.set(key,el);
     }
+    el.classList.toggle('stunned',!!item.stun);
     el.style.translate=(item.pos%W)*cell.width+'px '+Math.floor(item.pos/W)*cell.height+'px';
   }
 }
@@ -2536,7 +2547,7 @@ function undo() {
 }
 function restart() {loadLevel(state.level,state.map,state.mode,state.seed);$('maze').focus({preventScroll:true});}
 function newMaze() {if(state.mode==='endless')startEndless(state.endlessStage);else if(state.mode==='daily')loadLevel(3,null,'daily',state.seed);else loadLevel(state.level,null,state.mode==='shared'?'shared':'campaign');$('maze').focus({preventScroll:true});}
-let moveHold=null,holdTimer=null,gesture=null;
+let moveHold=null,holdTimer=null,gesture=null,gestureMoved=false,gestureResetTimer=null;
 function stopMovement() {clearTimeout(holdTimer);moveHold=null;}
 function beginMovement(direction,source) {
   stopMovement();if(!state||!['ready','playing'].includes(state.status)||replay||document.querySelector('dialog[open]'))return;
@@ -2570,16 +2581,18 @@ document.querySelectorAll('[data-direction]').forEach(button=>{
 });
 $('maze-stage').addEventListener('pointerdown',event=>{
   if(!event.isPrimary||event.button!==0){stopMovement();gesture=null;return;}
+  clearTimeout(gestureResetTimer);gestureMoved=false;
   event.preventDefault();gesture={id:event.pointerId,x:event.clientX,y:event.clientY,direction:null};event.currentTarget.setPointerCapture(event.pointerId);
 });
 $('maze-stage').addEventListener('pointermove',event=>{
   if(!gesture||gesture.id!==event.pointerId)return;event.preventDefault();
   const dx=event.clientX-gesture.x,dy=event.clientY-gesture.y;
   if(Math.max(Math.abs(dx),Math.abs(dy))<20){stopMovement();gesture.direction=null;return;}
+  gestureMoved=true;
   const direction=Math.abs(dx)>Math.abs(dy)?dx>0?'right':'left':dy>0?'down':'up';
   if(direction!==gesture.direction){gesture.direction=direction;beginMovement(direction,'gesture:'+event.pointerId);}
 });
-for(const type of ['pointerup','pointercancel','lostpointercapture'])$('maze-stage').addEventListener(type,event=>{if(gesture&&gesture.id===event.pointerId){gesture=null;stopMovement();}});
+for(const type of ['pointerup','pointercancel','lostpointercapture'])$('maze-stage').addEventListener(type,event=>{if(gesture&&gesture.id===event.pointerId){gesture=null;stopMovement();if(gestureMoved)gestureResetTimer=setTimeout(()=>{gestureMoved=false;},60);}});
 $('maze-stage').addEventListener('contextmenu',event=>event.preventDefault());
 $('pause').onclick=togglePause;$('resume').onclick=togglePause;
 $('pause-dialog').addEventListener('close',()=>{lastTick=performance.now();document.body.classList.remove('paused');renderHUD();resumeBgm();$('maze').focus({preventScroll:true});});
@@ -2681,6 +2694,7 @@ else window.addEventListener('resize',onStageResize);
 $('tutorial-done').onclick=finishTutorial;$('tutorial-skip').onclick=finishTutorial;
 /* 点击走：按坐标判定，不依赖命中哪个元素（画布被容器留白/滚动影响时，事件目标常常是容器本身） */
 document.addEventListener('click',event=>{
+  if(gestureMoved){clearTimeout(gestureResetTimer);gestureMoved=false;return;}
   if(!state||!state.map||replay)return;
   const view=$('maze');
   if(!view)return;

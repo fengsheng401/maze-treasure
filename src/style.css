@@ -1077,6 +1077,15 @@
     content: ''; position: absolute; left: -70%; top: -20%; width: 240%; height: 24%;
     background: #d3dde8; clip-path: polygon(50% 0, 100% 100%, 0 100%);
   }
+  .prop.guard.stunned {
+    opacity: .48;
+    filter: grayscale(.45);
+    animation: guardStun .45s ease-in-out infinite alternate;
+  }
+  @keyframes guardStun {
+    from { transform: rotate(-10deg) translateY(1px); }
+    to { transform: rotate(10deg) translateY(1px); }
+  }
 
   /* 锁门：石框 + 编号，锁着暗红，开了变金 */
   .prop.gate::before, .prop.gate-open::before {

@@ -275,8 +275,9 @@ function traceStep() {return {pos:state.pos,collected:[...state.collected],guard
 const shortestCache=new WeakMap();
 function solveShortest(map) {
   if(shortestCache.has(map))return shortestCache.get(map);
-  const size=map.cells.length,full=(1<<map.keys.length)-1,total=size*(full+1),bits=new Uint16Array(size),parents=new Int32Array(total).fill(-2),queue=new Int32Array(total);
+  const size=map.cells.length,full=(1<<map.keys.length)-1,total=size*(full+1),bits=new Uint16Array(size),doorKeys=new Int8Array(size).fill(-1),parents=new Int32Array(total).fill(-2),queue=new Int32Array(total);
   map.keys.forEach((id,index)=>bits[id]=1<<index);
+  if(map.doors)map.doors.forEach(d=>doorKeys[d.pos]=d.key);
   const neighbors=map.cells.map((wall,id)=>wall?[]:adjacent(map,id).filter(next=>!map.cells[next]));
   let head=0,tail=1;queue[0]=map.start;parents[map.start]=-1;
   while(head<tail) {
@@ -286,7 +287,7 @@ function solveShortest(map) {
       const result={steps:path.length-1,path};shortestCache.set(map,result);return result;
     }
     for(const next of neighbors[pos]) {
-      const door=map.doors&&map.doors.find(d=>d.pos===next);if(door&&!(mask&(1<<door.key)))continue;
+      const doorKey=doorKeys[next];if(doorKey>=0&&!(mask&(1<<doorKey)))continue;
       const nextMask=mask|bits[next];if(next===map.exit&&nextMask!==full)continue;
       const code=nextMask*size+next;if(parents[code]!==-2)continue;parents[code]=encoded;queue[tail++]=code;
     }

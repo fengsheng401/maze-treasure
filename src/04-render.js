@@ -54,11 +54,11 @@ function syncProps(view){
   if(!layer)return;
   if(propMap!==view.map){for(const el of propCache.values())el.remove();propCache.clear();propMap=view.map;}
   const cell=cellMetrics(),W=view.map.width,list=new Map();
-  const add=(pos,kind)=>list.set(pos+':'+kind,{pos,kind});
+  const add=(pos,kind,stun=false)=>list.set(pos+':'+kind,{pos,kind,stun});
   (view.map.items||[]).forEach(item=>{if(view.takenItems&&view.takenItems.has(item.pos))return;if(view.visible.has(item.pos))add(item.pos,'item-'+item.type);});
   (view.map.chests||[]).forEach(chest=>{if(view.visible.has(chest.pos))add(chest.pos,view.openedChests&&view.openedChests.has(chest.pos)?'chest-open':'chest');});
   (view.map.traps||[]).forEach(trap=>{if(trap.hardOnly&&view.difficulty!=='hardcore')return;if(view.visible.has(trap.pos))add(trap.pos,'trap');});
-  (view.guards||[]).forEach((guard,i)=>{const pos=view.map.guards[i].path[guard.index];if(view.visible.has(pos))add(pos,'guard');});
+  (view.guards||[]).forEach((guard,i)=>{const pos=view.map.guards[i].path[guard.index];if(view.visible.has(pos))add(pos,'guard',guard.stun>0);});
   (view.map.doors||[]).forEach(door=>{if(!view.seen.has(door.pos))return;add(door.pos,view.collected.has(view.map.keys[door.key])?'gate-open':'gate');});
   for(const [key,el] of propCache){if(!list.has(key)){el.remove();propCache.delete(key);}}
   for(const [key,item] of list){
@@ -71,6 +71,7 @@ function syncProps(view){
       layer.append(el);
       propCache.set(key,el);
     }
+    el.classList.toggle('stunned',!!item.stun);
     el.style.translate=(item.pos%W)*cell.width+'px '+Math.floor(item.pos/W)*cell.height+'px';
   }
 }
